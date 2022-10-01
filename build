@@ -1,0 +1,1 @@
+tsc game.ts --lib Dom,es2015
