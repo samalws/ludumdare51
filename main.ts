@@ -30,13 +30,32 @@ let dirVecMap = {
 }
 
 let originVec: Vec = { x: 0, y: 0 }
+let centerVec: Vec = { x: 500, y: 500 }
+let radius = 500
 
 function addVecs(a: Vec, b: Vec): Vec {
   return { x: a.x + b.x, y: a.y + b.y }
 }
 
+function subVecs(a: Vec, b: Vec): Vec {
+  return { x: a.x - b.x, y: a.y - b.y }
+}
+
 function mulVec(a: Vec, n: number): Vec {
   return { x: a.x * n, y: a.y * n }
+}
+
+function unitVec(a: Vec): Vec {
+  let mag = vecMagnitude(a)
+  return mulVec(a, mag == 0 ? 0 : (1/mag))
+}
+
+function vecMagnitudeSq(a: Vec): number {
+  return a.x*a.x + a.y*a.y
+}
+
+function vecMagnitude(a: Vec): number {
+  return Math.sqrt(vecMagnitudeSq(a))
 }
 
 function hitboxesCollide(a: HasHitbox, b: HasHitbox): boolean {
@@ -58,13 +77,14 @@ class Background implements Renderable, Updatable {
   update(delta: number) {}
 }
 
-class ExampleRect implements Renderable, Updatable, HasHitbox {
+class GameObject implements Renderable, Updatable, HasHitbox {
   pos: Vec
-  size: Vec = { x: 50, y: 50 }
+  size: Vec
   vel: Vec
-  constructor(pos, vel) { this.pos = pos; this.vel = vel }
+  color: string
+  constructor(pos, size, vel, color) { this.pos = pos; this.size = size; this.vel = vel; this.color = color }
   render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
-    ctx.fillStyle = "rgb(200, 0, 0)"
+    ctx.fillStyle = this.color
     ctx.fillRect(this.pos.x, this.pos.y, this.size.x, this.size.y)
   }
   update(delta: number) {
@@ -72,17 +92,23 @@ class ExampleRect implements Renderable, Updatable, HasHitbox {
   }
 }
 
-class Player implements Renderable, Updatable, HasHitbox {
-  pos: Vec = { x: 100, y: 100 }
-  size: Vec = { x: 50, y: 50 }
-  vel: Vec = originVec
-  constructor() {}
-  render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
-    ctx.fillStyle = "rgb(0, 200, 200)"
-    ctx.fillRect(this.pos.x, this.pos.y, this.size.x, this.size.y)
+class Center extends GameObject {
+  constructor() {
+    let size = { x: 10, y: 10 }
+    super(subVecs(centerVec, mulVec(size, .5)), size, originVec, "rgb(0, 0, 200)")
   }
   update(delta: number) {
-    this.pos = addVecs(this.pos, mulVec(this.vel, delta))
+    super.update(delta)
+    enemyList.forEach((e) => { if (hitboxesCollide(this, e)) gameOver() })
+  }
+}
+
+class Player extends GameObject {
+  constructor() {
+    super(centerVec, { x: 50, y: 50 }, originVec, "rgb(0, 200, 200)")
+  }
+  update(delta: number) {
+    super.update(delta)
     enemyList.forEach((e) => { if (hitboxesCollide(this, e)) removeEnemy(e) })
   }
   keysChanged(velNew: Vec) {
@@ -90,23 +116,47 @@ class Player implements Renderable, Updatable, HasHitbox {
   }
 }
 
-function removeEnemy(enemy) {
-  let indexA = enemyList.findIndex((e) => e === enemy)
-  if (indexA === undefined) return
-  enemyList.splice(indexA, 1)
-  let indexB = objectList.findIndex((e) => e === enemy)
-  if (indexB === undefined) return
-  objectList.splice(indexB, 1)
+class BasicEnemy extends GameObject {
+  constructor(pos: Vec) {
+    super(pos, { x: 50, y: 50 }, mulVec(unitVec(subVecs(centerVec, pos)), 10/1000), "rgb(200, 0, 0)")
+  }
 }
 
+function removeEnemy(enemy) {
+  let indexA = enemyList.findIndex((e) => e === enemy)
+  if (indexA !== undefined)
+    enemyList.splice(indexA, 1)
+  let indexB = objectList.findIndex((e) => e === enemy)
+  if (indexB !== undefined)
+    objectList.splice(indexB, 1)
+}
+
+// GAME STATE
 let player = new Player()
-let enemyList: (Renderable & Updatable & HasHitbox)[] = [
-  new ExampleRect({x: 0, y: 0}, {x: 10/1000, y: 0}),
-  new ExampleRect({x: 200, y: 0}, {x: 0, y: 10/1000}),
-  new ExampleRect({x: 0, y: 200}, {x: 10/1000, y: 0}),
-]
-let etcObjectList: (Renderable & Updatable)[] = [new Background, player]
-let objectList: (Renderable & Updatable)[] = etcObjectList.concat(enemyList)
+let enemyList: (Renderable & Updatable & HasHitbox)[] = []
+let objectList: (Renderable & Updatable)[] = [new Background, new Center, player]
+var timeToEnemySpawn = 0
+
+function spawnEnemy() {
+  let theta = Math.random() * 2 * Math.PI
+  let pos = addVecs(centerVec, { x: radius * Math.cos(theta), y: radius * Math.sin(theta) })
+  let enemy = new BasicEnemy(pos)
+  enemyList.push(enemy)
+  objectList.push(enemy)
+}
+
+function update(delta: number) {
+  objectList.forEach((r) => r.update(delta))
+  timeToEnemySpawn -= delta
+  if (timeToEnemySpawn <= 0) {
+    timeToEnemySpawn = 1000 * 10
+    spawnEnemy()
+  }
+}
+
+function gameOver() {
+  alert("Game over")
+}
 
 let canvas = document.getElementById("canvas") as HTMLCanvasElement
 let context = canvas.getContext("2d")
@@ -122,7 +172,7 @@ window.setInterval(() => {
   let newNow = Date.now()
   let delta = newNow - lastUpdate
   lastUpdate = newNow
-  objectList.forEach((r) => r.update(delta))
+  update(delta)
 }, 1000/60)
 
 let enumDirMap = {
@@ -141,7 +191,7 @@ let keysDown = {
 
 let alertKey = (upOrDown: boolean) => (event: KeyboardEvent) => {
   let dir = enumDirMap[event.code]
-  if (dir === undefined) { return }
+  if (dir === undefined) return
   keysDown[dir] = upOrDown
   var addedDir = originVec
   allDirections.forEach((dir) => { addedDir = addVecs(addedDir, keysDown[dir] ? dirVecMap[dir] : originVec) })
