@@ -68,6 +68,22 @@ function hitboxesCollide(a: HasHitbox, b: HasHitbox): boolean {
   return xInside && yInside
 }
 
+let imgs: { [name: string]: HTMLImageElement[] } = {}
+
+function loadImg(name: string, num: number) {
+  let imgList: HTMLImageElement[] = []
+  for (var i = 1; i <= num; i++) {
+    let img = new Image
+    img.src = name + i + ".png"
+    imgList.push(img)
+  }
+  imgs[name] = imgList
+}
+
+loadImg("player", 2)
+loadImg("enemy", 2)
+loadImg("center", 1)
+
 class Background implements Renderable, Updatable {
   constructor() {}
   render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
@@ -92,21 +108,35 @@ class GameObject implements Renderable, Updatable, HasHitbox {
   pos: Vec
   size: Vec
   vel: Vec
-  color: string
-  constructor(pos, size, vel, color) { this.pos = subVecs(pos, mulVec(size, .5)); this.size = size; this.vel = vel; this.color = color }
+  imgs: HTMLImageElement[]
+  imgIndex = 0
+  frameCtr: number
+  invFramerate: number
+  constructor(pos: Vec, size: Vec, vel: Vec, imgName: string, framerateHz: number = 30) {
+    this.pos = subVecs(pos, mulVec(size, .5))
+    this.size = size
+    this.vel = vel
+    this.imgs = imgs[imgName]
+    this.invFramerate = 1000/framerateHz
+    this.frameCtr = this.invFramerate
+  }
   render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
-    ctx.fillStyle = this.color
-    ctx.fillRect(this.pos.x, this.pos.y, this.size.x, this.size.y)
+    ctx.drawImage(this.imgs[this.imgIndex], this.pos.x, this.pos.y)
   }
   update(delta: number) {
     this.pos = addVecs(this.pos, mulVec(this.vel, delta))
+    this.frameCtr -= delta
+    if (this.frameCtr <= 0) {
+      this.imgIndex = (this.imgIndex+1) % this.imgs.length
+      this.frameCtr = this.invFramerate
+    }
   }
 }
 
 class Center extends GameObject {
   constructor() {
     let size = { x: 10, y: 10 }
-    super(centerVec, { x: 10, y: 10 }, originVec, "rgb(0, 0, 200)")
+    super(centerVec, { x: 10, y: 10 }, originVec, "center")
   }
   update(delta: number) {
     super.update(delta)
@@ -116,7 +146,7 @@ class Center extends GameObject {
 
 class Player extends GameObject {
   constructor() {
-    super(centerVec, { x: 50, y: 50 }, originVec, "rgb(0, 200, 200)")
+    super(centerVec, { x: 50, y: 50 }, originVec, "player")
   }
   update(delta: number) {
     super.update(delta)
@@ -129,11 +159,11 @@ class Player extends GameObject {
 
 class BasicEnemy extends GameObject {
   constructor(pos: Vec) {
-    super(pos, { x: 50, y: 50 }, mulVec(unitVec(subVecs(centerVec, pos)), 10/1000), "rgb(200, 0, 0)")
+    super(pos, { x: 50, y: 50 }, mulVec(unitVec(subVecs(centerVec, pos)), 10/1000), "enemy")
   }
 }
 
-function removeEnemy(enemy) {
+function removeEnemy(enemy: Renderable & Updatable & HasHitbox) {
   let indexA = enemyList.findIndex((e) => e === enemy)
   if (indexA !== undefined)
     enemyList.splice(indexA, 1)
@@ -207,7 +237,7 @@ function resetGame() {
   initGame()
 }
 
-let enumDirMap = {
+let enumDirMap: { [s: string]: Direction } = {
   "ArrowLeft": Direction.Left,
   "ArrowRight": Direction.Right,
   "ArrowUp": Direction.Up,
@@ -222,7 +252,6 @@ let keysDown = {
 }
 
 let alertKey = (upOrDown: boolean) => (event: KeyboardEvent) => {
-  console.log(event.code)
   if (event.code == "KeyR" && !upOrDown && !gameIsTut) {
     resetGame()
   } else if (event.code == "Space" && !upOrDown && gameIsTut) {
@@ -247,6 +276,7 @@ let context = canvas.getContext("2d")
 
 function renderScreen() {
   window.requestAnimationFrame(renderScreen)
+  if (context === null) return // TODO why is --strict not happy with this?
   objectList.forEach((r) => r.render(context, canvas.width, canvas.height))
 }
 renderScreen()
