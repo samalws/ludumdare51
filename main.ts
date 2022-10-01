@@ -8,7 +8,7 @@ interface Updatable {
 
 interface HasHitbox {
   readonly pos: Vec
-  readonly size: Vec
+  getRadius: () => number
 }
 
 enum Direction {
@@ -68,41 +68,33 @@ function randomRadiusVec(rad: number): Vec {
 }
 
 function hitboxesCollide(a: HasHitbox, b: HasHitbox): boolean {
-  const a1 = a.pos
-  const a2 = addVecs(a.pos, a.size)
-  const b1 = b.pos
-  const b2 = addVecs(b.pos, b.size)
-  const xInside = (a1.x <= b1.x && a2.x >= b1.x) || (a1.x >= b1.x && a1.x <= b2.x)
-  const yInside = (a1.y <= b1.y && a2.y >= b1.y) || (a1.y >= b1.y && a1.y <= b2.y)
-  return xInside && yInside
+  const minDist = a.getRadius() + b.getRadius()
+  const distSq = vecMagnitudeSq(subVecs(a.pos, b.pos))
+  return distSq <= minDist*minDist
 }
 
-const imgs: { [name: string]: HTMLImageElement[] } = {}
+const imgs: { [name: string]: HTMLImageElement } = {}
 
-function loadImg(name: string, num: number) {
-  const imgList: HTMLImageElement[] = []
-  for (let i = 1; i <= num; i++) {
-    const img = new Image
-    img.src = name + i + ".png"
-    imgList.push(img)
-  }
-  imgs[name] = imgList
+function loadImg(name: string) {
+  const img = new Image
+  img.src = name + ".png"
+  imgs[name] = img
 }
 
-loadImg("player", 2)
-loadImg("enemy", 2)
-loadImg("waitingEnemy", 1)
-loadImg("wizEnemy", 1)
-loadImg("greyGooEnemy", 1)
-loadImg("scaredEnemy", 1)
-loadImg("swirlEnemy", 1)
-loadImg("tpEnemy", 1)
-loadImg("center", 1)
+loadImg("player")
+loadImg("enemy")
+loadImg("waitingEnemy")
+loadImg("wizEnemy")
+loadImg("greyGooEnemy")
+loadImg("scaredEnemy")
+loadImg("swirlEnemy")
+loadImg("tpEnemy")
+loadImg("center")
 
 class Background implements Renderable, Updatable {
   constructor() {}
   render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
-    ctx.fillStyle = "rgb(0, 0, 0)"
+    ctx.fillStyle = "#2A324B"
     ctx.fillRect(0, 0, xSize, ySize)
   }
   update(delta: number) {}
@@ -113,7 +105,7 @@ class TextObj implements Renderable, Updatable {
   constructor(text: string) { this.text = text }
   render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
     ctx.font = "48px sans-serif"
-    ctx.fillStyle = "rgb(200, 0, 0)"
+    ctx.fillStyle = "#E58F65"
     ctx.fillText(this.text, 10, 50)
   }
   update(delta: number) {}
@@ -126,38 +118,43 @@ class ScoreObj extends TextObj {
   }
 }
 
+const imgWidthToRadius = .5*Math.sqrt(2)
+
 class GameObject implements Renderable, Updatable, HasHitbox {
   pos: Vec
-  readonly size: Vec
   vel: Vec
-  readonly imgs: HTMLImageElement[]
-  imgIndex = 0
-  frameCtr: number
-  readonly invFramerate: number
-  constructor(pos: Vec, size: Vec, vel: Vec, imgName: string, framerateHz: number = 30) {
-    this.pos = subVecs(pos, mulVec(size, .5))
-    this.size = size
+  readonly img: HTMLImageElement
+  constructor(pos: Vec, vel: Vec, imgName: string, framerateHz: number = 30) {
+    this.pos = pos
     this.vel = vel
-    this.imgs = imgs[imgName]
-    this.invFramerate = 1000/framerateHz
-    this.frameCtr = this.invFramerate
+    this.setVel(vel)
+    this.img = imgs[imgName]
   }
+  imgAngle = 0
   render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
-    ctx.drawImage(this.imgs[this.imgIndex], this.pos.x, this.pos.y)
+    ctx.save()
+    ctx.translate(this.pos.x, this.pos.y)
+    ctx.rotate(this.imgAngle)
+    ctx.drawImage(this.img, -this.img.width*.5, -this.img.height*.5)
+    ctx.restore()
   }
   update(delta: number) {
     this.pos = addVecs(this.pos, mulVec(this.vel, delta))
-    this.frameCtr -= delta
-    if (this.frameCtr <= 0) {
-      this.imgIndex = (this.imgIndex+1) % this.imgs.length
-      this.frameCtr = this.invFramerate
-    }
+  }
+  setVel(newVel: Vec) {
+    this.vel = newVel
+    if (vecMagnitudeSq(newVel) > .0001)
+      this.imgAngle = Math.atan2(newVel.x, -newVel.y)
+    // TODO when youre moving diagonally and then release both the sprite becomes horizontal
+  }
+  getRadius() {
+    return this.img.width*imgWidthToRadius
   }
 }
 
 class Center extends GameObject {
   constructor() {
-    super(centerVec, vec(10, 10), originVec, "center")
+    super(centerVec, originVec, "center")
   }
   update(delta: number) {
     super.update(delta)
@@ -168,25 +165,22 @@ class Center extends GameObject {
 const oneOverSqrt2 = 1/Math.sqrt(2)
 
 class Player extends GameObject {
-  readonly relCenter: Vec
   constructor() {
-    const size: Vec = vec(25, 25)
-    super(addVecs(centerVec, vec(0, innerRadius)), size, originVec, "player")
-    this.relCenter = subVecs(centerVec, mulVec(size, .5))
+    super(addVecs(centerVec, vec(0, innerRadius)), originVec, "player")
   }
   update(delta: number) {
     super.update(delta)
     enemyList.forEach((e) => { if (hitboxesCollide(this, e)) removeEnemy(e) })
 
-    const relPos = subVecs(this.pos, this.relCenter)
+    const relPos = subVecs(this.pos, centerVec)
     const distFromCenterSq = vecMagnitudeSq(relPos)
     if (distFromCenterSq < innerRadiusSq)
-      this.pos = addVecs(this.relCenter, mulVec(relPos, innerRadius/Math.sqrt(distFromCenterSq)))
+      this.pos = addVecs(centerVec, mulVec(relPos, innerRadius/Math.sqrt(distFromCenterSq)))
   }
   keysChanged(velNew: Vec) {
     if (vecMagnitudeSq(velNew) == 2)
       velNew = mulVec(velNew, oneOverSqrt2)
-    this.vel = mulVec(velNew, 100/1000)
+    this.setVel(mulVec(velNew, 100/1000))
   }
 }
 
@@ -206,14 +200,14 @@ function velCenterBlend(pos: Vec, towardsSpeed: number, perpSpeed: number) {
 
 class Enemy extends GameObject {
   givesPoints = true
-  constructor(pos: Vec, size: Vec, vel: Vec, imgName: string, framerateHz: number = 30) {
-    super(pos, size, vel, imgName, framerateHz)
+  constructor(pos: Vec, vel: Vec, imgName: string, framerateHz: number = 30) {
+    super(pos, vel, imgName, framerateHz)
   }
 }
 
 class BasicEnemy extends Enemy {
   constructor(pos: Vec) {
-    super(pos, vec(50, 50), velTowardsCenter(pos, 50/1000), "enemy")
+    super(pos, velTowardsCenter(pos, 50/1000), "enemy")
   }
 }
 
@@ -222,14 +216,14 @@ const basicEnemy = (pos: Vec) => new BasicEnemy(pos)
 class WaitingEnemy extends Enemy {
   timeLeft = 1000 * 20 * Math.random()
   constructor(pos: Vec) {
-    super(pos, vec(50, 50), originVec, "waitingEnemy")
+    super(pos, originVec, "waitingEnemy")
   }
   update(delta: number) {
     super.update(delta)
     if (this.timeLeft <= 0) return
     this.timeLeft -= delta
     if (this.timeLeft > 0) return
-    this.vel = velTowardsCenter(this.pos, 70/1000)
+    this.setVel(velTowardsCenter(this.pos, 70/1000))
   }
 }
 
@@ -239,7 +233,7 @@ class WizEnemy extends Enemy {
   static readonly spawnTimeFull = 1000 * 10
   timeToNewSpawn = WizEnemy.spawnTimeFull
   constructor(pos: Vec) {
-    super(pos, vec(40, 40), originVec, "wizEnemy")
+    super(pos, originVec, "wizEnemy")
   }
   update(delta: number) {
     this.timeToNewSpawn -= delta
@@ -259,7 +253,7 @@ class GreyGooEnemy extends Enemy {
   static readonly defltSpawnsLeft = 10
   readonly spawnsLeft: number
   constructor(pos: Vec, spawnsLeft: number) {
-    super(pos, vec(25, 25), velTowardsCenter(pos, 10/1000), "greyGooEnemy")
+    super(pos, velTowardsCenter(pos, 10/1000), "greyGooEnemy")
     this.spawnsLeft = spawnsLeft
     this.givesPoints = spawnsLeft == GreyGooEnemy.defltSpawnsLeft
   }
@@ -281,16 +275,16 @@ class ScaredEnemy extends Enemy {
   readonly towardsVec: Vec
   readonly awayVec: Vec
   constructor(pos: Vec) {
-    super(pos, vec(60, 60), velTowardsCenter(pos, 50/1000), "scaredEnemy")
+    super(pos, velTowardsCenter(pos, 50/1000), "scaredEnemy")
     this.towardsVec = this.vel
     this.awayVec = velTowardsCenter(pos, -60/1000)
   }
   update(delta: number) {
     super.update(delta)
     if (vecMagnitudeSq(subVecs(player.pos, this.pos)) < 100*100)
-      this.vel = this.awayVec
+      this.setVel(this.awayVec)
     else
-      this.vel = this.towardsVec
+      this.setVel(this.towardsVec)
   }
 }
 
@@ -300,13 +294,13 @@ class SwirlEnemy extends Enemy {
   timeToUpdate = 0
   static readonly updateTimeFull = 1000 / 10
   constructor(pos: Vec) {
-    super(pos, vec(30, 30), originVec, "swirlEnemy")
+    super(pos, originVec, "swirlEnemy")
   }
   update(delta: number) {
     super.update(delta)
     this.timeToUpdate -= delta
     if (this.timeToUpdate <= 0) {
-      this.vel = velCenterBlend(this.pos /* technically wrong since should subtract size/2 */, 50/1000, 100/1000)
+      this.setVel(velCenterBlend(this.pos, 50/1000, 100/1000))
       this.timeToUpdate = SwirlEnemy.updateTimeFull
     }
   }
@@ -318,14 +312,14 @@ class TpEnemy extends Enemy {
   static readonly tpTimeFull = 1000 * 3
   timeToTp = TpEnemy.tpTimeFull
   constructor(pos: Vec) {
-    super(pos, vec(30, 30), velTowardsCenter(pos, 50/1000), "tpEnemy")
+    super(pos, velTowardsCenter(pos, 50/1000), "tpEnemy")
   }
   update(delta: number) {
     super.update(delta)
     this.timeToTp -= delta
     if (this.timeToTp <= 0) {
-      this.pos = addVecs(this.pos, velCenterBlend(this.pos /* technically wrong since should subtract size/2 */, 50, 100))
-      this.vel = velTowardsCenter(this.pos /* ditto here */, 50/1000)
+      this.pos = addVecs(this.pos, velCenterBlend(this.pos, 50, 100))
+      this.setVel(velTowardsCenter(this.pos, 50/1000))
       this.timeToTp = TpEnemy.tpTimeFull
     }
   }
