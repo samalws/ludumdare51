@@ -293,12 +293,17 @@ document.addEventListener("keyup", alertKey(false), false)
 
 initTut()
 
-let canvas = document.getElementById("canvas") as HTMLCanvasElement
-let context = canvas.getContext("2d")
+function checkContext(x: CanvasRenderingContext2D | null): CanvasRenderingContext2D {
+  if (x === null)
+    throw "null rendering context"
+  return x
+}
+
+const canvas = document.getElementById("canvas") as HTMLCanvasElement
+const context = checkContext(canvas.getContext("2d"))
 
 function renderScreen() {
   window.requestAnimationFrame(renderScreen)
-  if (context === null) return // TODO why is --strict not happy with this?
   objectList.forEach((r) => r.render(context, canvas.width, canvas.height))
 }
 renderScreen()
