@@ -86,6 +86,7 @@ function loadImg(name: string, num: number) {
 
 loadImg("player", 2)
 loadImg("enemy", 2)
+loadImg("wizEnemy", 1)
 loadImg("center", 1)
 
 class Background implements Renderable, Updatable {
@@ -155,7 +156,7 @@ class Center extends GameObject {
 }
 
 class Player extends GameObject {
-  relCenter: Vec
+  readonly relCenter: Vec
   constructor() {
     const size: Vec = vec(25, 25)
     super(addVecs(centerVec, vec(0, innerRadius)), size, originVec, "player")
@@ -181,6 +182,26 @@ class BasicEnemy extends GameObject {
   }
 }
 
+const basicEnemy = (pos: Vec) => new BasicEnemy(pos)
+
+class WizEnemy extends GameObject {
+  static readonly spawnTimeFull = 1000 * 7
+  timeToNewSpawn = WizEnemy.spawnTimeFull
+  constructor(pos: Vec) {
+    super(pos, vec(40, 40), originVec, "wizEnemy")
+  }
+  update(delta: number) {
+    this.timeToNewSpawn -= delta
+    if (this.timeToNewSpawn <= 0) {
+      // TODO animate
+      spawnEnemy(basicEnemy)
+      this.timeToNewSpawn = WizEnemy.spawnTimeFull
+    }
+  }
+}
+
+const wizEnemy = (pos: Vec) => new WizEnemy(pos)
+
 function removeEnemy(enemy: Renderable & Updatable & HasHitbox) {
   const indexA = enemyList.findIndex((e) => e === enemy)
   if (indexA !== undefined)
@@ -201,10 +222,10 @@ let timer: number
 let gameIsOver: boolean = true
 let gameIsTut: boolean = false
 
-function spawnEnemy() {
+function spawnEnemy(ctor: (v: Vec) => (Renderable & Updatable & HasHitbox)) {
   const theta = Math.random() * 2 * Math.PI
   const pos = addVecs(centerVec, vec(radius * Math.cos(theta), radius * Math.sin(theta)))
-  const enemy = new BasicEnemy(pos)
+  const enemy = ctor(pos)
   enemyList.push(enemy)
   objectList.push(enemy)
 }
@@ -214,8 +235,7 @@ function update(delta: number) {
   timeToEnemySpawn -= delta
   if (timeToEnemySpawn <= 0) {
     timeToEnemySpawn = 1000 * 10
-    spawnEnemy()
-    spawnEnemy()
+    spawnEnemy(wizEnemy)
   }
 }
 
