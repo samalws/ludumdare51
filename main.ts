@@ -33,7 +33,7 @@ const dirVecMap = {
 
 const originVec: Vec = vec(0, 0)
 const centerVec: Vec = vec(600, 600)
-const radius = 500
+const outerRadius = 500
 const innerRadius = 100
 const innerRadiusSq = innerRadius*innerRadius
 
@@ -62,6 +62,11 @@ function vecMagnitude(a: Vec): number {
   return Math.sqrt(vecMagnitudeSq(a))
 }
 
+function randomRadiusVec(rad: number): Vec {
+  const theta = Math.random() * 2 * Math.PI
+  return vec(rad * Math.cos(theta), rad * Math.sin(theta))
+}
+
 function hitboxesCollide(a: HasHitbox, b: HasHitbox): boolean {
   const a1 = a.pos
   const a2 = addVecs(a.pos, a.size)
@@ -86,7 +91,9 @@ function loadImg(name: string, num: number) {
 
 loadImg("player", 2)
 loadImg("enemy", 2)
+loadImg("waitingEnemy", 1)
 loadImg("wizEnemy", 1)
+loadImg("greyGooEnemy", 1)
 loadImg("center", 1)
 
 class Background implements Renderable, Updatable {
@@ -155,6 +162,8 @@ class Center extends GameObject {
   }
 }
 
+const oneOverSqrt2 = 1/Math.sqrt(2)
+
 class Player extends GameObject {
   readonly relCenter: Vec
   constructor() {
@@ -172,17 +181,39 @@ class Player extends GameObject {
       this.pos = addVecs(this.relCenter, mulVec(relPos, innerRadius/Math.sqrt(distFromCenterSq)))
   }
   keysChanged(velNew: Vec) {
+    if (vecMagnitudeSq(velNew) == 2)
+      velNew = mulVec(velNew, oneOverSqrt2)
     this.vel = mulVec(velNew, 100/1000)
   }
 }
 
+function velTowardsCenter(pos: Vec, speed: number): Vec {
+  return mulVec(unitVec(subVecs(centerVec, pos)), speed)
+}
+
 class BasicEnemy extends GameObject {
   constructor(pos: Vec) {
-    super(pos, vec(50, 50), mulVec(unitVec(subVecs(centerVec, pos)), 50/1000), "enemy")
+    super(pos, vec(50, 50), velTowardsCenter(pos, 50/1000), "enemy")
   }
 }
 
 const basicEnemy = (pos: Vec) => new BasicEnemy(pos)
+
+class WaitingEnemy extends GameObject {
+  timeLeft = 1000 * 20 * Math.random()
+  constructor(pos: Vec) {
+    super(pos, vec(50, 50), originVec, "waitingEnemy")
+  }
+  update(delta: number) {
+    super.update(delta)
+    if (this.timeLeft <= 0) return
+    this.timeLeft -= delta
+    if (this.timeLeft > 0) return
+    this.vel = velTowardsCenter(this.pos, 70/1000)
+  }
+}
+
+const waitingEnemy = (pos: Vec) => new WaitingEnemy(pos)
 
 class WizEnemy extends GameObject {
   static readonly spawnTimeFull = 1000 * 7
@@ -201,6 +232,25 @@ class WizEnemy extends GameObject {
 }
 
 const wizEnemy = (pos: Vec) => new WizEnemy(pos)
+
+class GreyGooEnemy extends GameObject {
+  // will make 2^((outerRadius/speed)/spawnTimeFull) = 2^((500/10)/5) = 2^10 = 1024 clones before reaching center
+  static readonly spawnTimeFull = 1000 * 5
+  timeToNewSpawn = GreyGooEnemy.spawnTimeFull
+  constructor(pos: Vec) {
+    super(pos, vec(25, 25), velTowardsCenter(pos, 10/1000), "greyGooEnemy")
+  }
+  update(delta: number) {
+    super.update(delta)
+    this.timeToNewSpawn -= delta
+    if (this.timeToNewSpawn <= 0) {
+      spawnEnemy(greyGooEnemy, addVecs(this.pos, randomRadiusVec(50)))
+      this.timeToNewSpawn = GreyGooEnemy.spawnTimeFull
+    }
+  }
+}
+
+const greyGooEnemy = (pos: Vec) => new GreyGooEnemy(pos)
 
 function removeEnemy(enemy: Renderable & Updatable & HasHitbox) {
   const indexA = enemyList.findIndex((e) => e === enemy)
@@ -222,9 +272,8 @@ let timer: number
 let gameIsOver: boolean = true
 let gameIsTut: boolean = false
 
-function spawnEnemy(ctor: (v: Vec) => (Renderable & Updatable & HasHitbox)) {
-  const theta = Math.random() * 2 * Math.PI
-  const pos = addVecs(centerVec, vec(radius * Math.cos(theta), radius * Math.sin(theta)))
+function spawnEnemy(ctor: (v: Vec) => (Renderable & Updatable & HasHitbox), pos?: Vec) {
+  pos = pos ?? addVecs(centerVec, randomRadiusVec(outerRadius))
   const enemy = ctor(pos)
   enemyList.push(enemy)
   objectList.push(enemy)
@@ -235,7 +284,17 @@ function update(delta: number) {
   timeToEnemySpawn -= delta
   if (timeToEnemySpawn <= 0) {
     timeToEnemySpawn = 1000 * 10
-    spawnEnemy(wizEnemy)
+    const rng = Math.random()
+    if (rng < .25)
+      spawnEnemy(wizEnemy)
+    else if (rng < .5)
+      spawnEnemy(waitingEnemy)
+    else if (rng < .75)
+      spawnEnemy(greyGooEnemy)
+    else {
+      spawnEnemy(basicEnemy)
+      spawnEnemy(basicEnemy)
+    }
   }
 }
 
