@@ -34,7 +34,7 @@ const dirVecMap = {
 const originVec: Vec = vec(0, 0)
 const centerVec: Vec = vec(600, 600)
 const outerRadius = 500
-const innerRadius = 100
+const innerRadius = 50
 const innerRadiusSq = innerRadius*innerRadius
 
 function addVecs(a: Vec, b: Vec): Vec {
@@ -94,6 +94,9 @@ loadImg("enemy", 2)
 loadImg("waitingEnemy", 1)
 loadImg("wizEnemy", 1)
 loadImg("greyGooEnemy", 1)
+loadImg("scaredEnemy", 1)
+loadImg("swirlEnemy", 1)
+loadImg("tpEnemy", 1)
 loadImg("center", 1)
 
 class Background implements Renderable, Updatable {
@@ -191,7 +194,24 @@ function velTowardsCenter(pos: Vec, speed: number): Vec {
   return mulVec(unitVec(subVecs(centerVec, pos)), speed)
 }
 
-class BasicEnemy extends GameObject {
+function velPerpCenter(pos: Vec, speed: number): Vec {
+  const towards = velTowardsCenter(pos, speed)
+  return vec(-towards.y, towards.x)
+}
+
+function velCenterBlend(pos: Vec, towardsSpeed: number, perpSpeed: number) {
+  const towards = velTowardsCenter(pos, 1)
+  return vec(towards.x * towardsSpeed - towards.y * perpSpeed, towards.y * towardsSpeed + towards.x * perpSpeed)
+}
+
+class Enemy extends GameObject {
+  givesPoints = true
+  constructor(pos: Vec, size: Vec, vel: Vec, imgName: string, framerateHz: number = 30) {
+    super(pos, size, vel, imgName, framerateHz)
+  }
+}
+
+class BasicEnemy extends Enemy {
   constructor(pos: Vec) {
     super(pos, vec(50, 50), velTowardsCenter(pos, 50/1000), "enemy")
   }
@@ -199,7 +219,7 @@ class BasicEnemy extends GameObject {
 
 const basicEnemy = (pos: Vec) => new BasicEnemy(pos)
 
-class WaitingEnemy extends GameObject {
+class WaitingEnemy extends Enemy {
   timeLeft = 1000 * 20 * Math.random()
   constructor(pos: Vec) {
     super(pos, vec(50, 50), originVec, "waitingEnemy")
@@ -215,8 +235,8 @@ class WaitingEnemy extends GameObject {
 
 const waitingEnemy = (pos: Vec) => new WaitingEnemy(pos)
 
-class WizEnemy extends GameObject {
-  static readonly spawnTimeFull = 1000 * 7
+class WizEnemy extends Enemy {
+  static readonly spawnTimeFull = 1000 * 10
   timeToNewSpawn = WizEnemy.spawnTimeFull
   constructor(pos: Vec) {
     super(pos, vec(40, 40), originVec, "wizEnemy")
@@ -233,38 +253,100 @@ class WizEnemy extends GameObject {
 
 const wizEnemy = (pos: Vec) => new WizEnemy(pos)
 
-class GreyGooEnemy extends GameObject {
-  // will make 2^((outerRadius/speed)/spawnTimeFull) = 2^((500/10)/5) = 2^10 = 1024 clones before reaching center
+class GreyGooEnemy extends Enemy {
   static readonly spawnTimeFull = 1000 * 5
   timeToNewSpawn = GreyGooEnemy.spawnTimeFull
-  constructor(pos: Vec) {
+  static readonly defltSpawnsLeft = 10
+  readonly spawnsLeft: number
+  constructor(pos: Vec, spawnsLeft: number) {
     super(pos, vec(25, 25), velTowardsCenter(pos, 10/1000), "greyGooEnemy")
+    this.spawnsLeft = spawnsLeft
+    this.givesPoints = spawnsLeft == GreyGooEnemy.defltSpawnsLeft
   }
   update(delta: number) {
     super.update(delta)
+    if (this.spawnsLeft == 0) return
     this.timeToNewSpawn -= delta
     if (this.timeToNewSpawn <= 0) {
-      spawnEnemy(greyGooEnemy, addVecs(this.pos, randomRadiusVec(50)))
+      spawnEnemy(greyGooEnemy(this.spawnsLeft-1), addVecs(this.pos, randomRadiusVec(50)))
       this.timeToNewSpawn = GreyGooEnemy.spawnTimeFull
     }
   }
 }
 
-const greyGooEnemy = (pos: Vec) => new GreyGooEnemy(pos)
+const greyGooEnemy = (spawnsLeft: number) => (pos: Vec) => new GreyGooEnemy(pos, spawnsLeft)
+const greyGooEnemyDeflt = greyGooEnemy(GreyGooEnemy.defltSpawnsLeft)
 
-function removeEnemy(enemy: Renderable & Updatable & HasHitbox) {
+class ScaredEnemy extends Enemy {
+  readonly towardsVec: Vec
+  readonly awayVec: Vec
+  constructor(pos: Vec) {
+    super(pos, vec(60, 60), velTowardsCenter(pos, 50/1000), "scaredEnemy")
+    this.towardsVec = this.vel
+    this.awayVec = velTowardsCenter(pos, -60/1000)
+  }
+  update(delta: number) {
+    super.update(delta)
+    if (vecMagnitudeSq(subVecs(player.pos, this.pos)) < 100*100)
+      this.vel = this.awayVec
+    else
+      this.vel = this.towardsVec
+  }
+}
+
+const scaredEnemy = (pos: Vec) => new ScaredEnemy(pos)
+
+class SwirlEnemy extends Enemy {
+  timeToUpdate = 0
+  static readonly updateTimeFull = 1000 / 10
+  constructor(pos: Vec) {
+    super(pos, vec(30, 30), originVec, "swirlEnemy")
+  }
+  update(delta: number) {
+    super.update(delta)
+    this.timeToUpdate -= delta
+    if (this.timeToUpdate <= 0) {
+      this.vel = velCenterBlend(this.pos /* technically wrong since should subtract size/2 */, 50/1000, 100/1000)
+      this.timeToUpdate = SwirlEnemy.updateTimeFull
+    }
+  }
+}
+
+const swirlEnemy = (pos: Vec) => new SwirlEnemy(pos)
+
+class TpEnemy extends Enemy {
+  static readonly tpTimeFull = 1000 * 3
+  timeToTp = TpEnemy.tpTimeFull
+  constructor(pos: Vec) {
+    super(pos, vec(30, 30), velTowardsCenter(pos, 50/1000), "tpEnemy")
+  }
+  update(delta: number) {
+    super.update(delta)
+    this.timeToTp -= delta
+    if (this.timeToTp <= 0) {
+      this.pos = addVecs(this.pos, velCenterBlend(this.pos /* technically wrong since should subtract size/2 */, 50, 100))
+      this.vel = velTowardsCenter(this.pos /* ditto here */, 50/1000)
+      this.timeToTp = TpEnemy.tpTimeFull
+    }
+  }
+}
+
+const tpEnemy = (pos: Vec) => new TpEnemy(pos)
+
+function removeEnemy(enemy: Enemy) {
   const indexA = enemyList.findIndex((e) => e === enemy)
   if (indexA !== undefined)
     enemyList.splice(indexA, 1)
   const indexB = objectList.findIndex((e) => e === enemy)
   if (indexB !== undefined)
     objectList.splice(indexB, 1)
-  score += 1
+  if (enemy.givesPoints)
+    score += 1
 }
 
 // GAME STATE
 let player: Player
-let enemyList: (Renderable & Updatable & HasHitbox)[]
+let enemyList: Enemy[]
 let objectList: (Renderable & Updatable)[]
 let score: number
 let timeToEnemySpawn: number
@@ -272,7 +354,7 @@ let timer: number
 let gameIsOver: boolean = true
 let gameIsTut: boolean = false
 
-function spawnEnemy(ctor: (v: Vec) => (Renderable & Updatable & HasHitbox), pos?: Vec) {
+function spawnEnemy(ctor: (v: Vec) => Enemy, pos?: Vec) {
   pos = pos ?? addVecs(centerVec, randomRadiusVec(outerRadius))
   const enemy = ctor(pos)
   enemyList.push(enemy)
@@ -284,16 +366,25 @@ function update(delta: number) {
   timeToEnemySpawn -= delta
   if (timeToEnemySpawn <= 0) {
     timeToEnemySpawn = 1000 * 10
-    const rng = Math.random()
-    if (rng < .25)
-      spawnEnemy(wizEnemy)
-    else if (rng < .5)
-      spawnEnemy(waitingEnemy)
-    else if (rng < .75)
-      spawnEnemy(greyGooEnemy)
-    else {
-      spawnEnemy(basicEnemy)
-      spawnEnemy(basicEnemy)
+    const numSpawnsDec = Math.floor(Math.random() * 2)
+    for (let i = 0; i <= numSpawnsDec; i++) {
+      const rng = Math.random()
+      if (rng < 1/7)
+        spawnEnemy(wizEnemy)
+      else if (rng < 2/7)
+        spawnEnemy(waitingEnemy)
+      else if (rng < 3/6)
+        spawnEnemy(greyGooEnemyDeflt)
+      else if (rng < 4/7)
+        spawnEnemy(scaredEnemy)
+      else if (rng < 5/7)
+        spawnEnemy(swirlEnemy)
+      else if (rng < 6/7)
+        spawnEnemy(tpEnemy)
+      else {
+        spawnEnemy(basicEnemy)
+        spawnEnemy(basicEnemy)
+      }
     }
   }
 }
