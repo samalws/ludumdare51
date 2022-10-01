@@ -77,6 +77,16 @@ class Background implements Renderable, Updatable {
   update(delta: number) {}
 }
 
+class GameOverText implements Renderable, Updatable {
+  constructor() {}
+  render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
+    ctx.font = "48px sans-serif"
+    ctx.fillStyle = "rgb(200, 0, 0)"
+    ctx.fillText("Game over! Press R to play again", 10, 50)
+  }
+  update(delta: number) {}
+}
+
 class GameObject implements Renderable, Updatable, HasHitbox {
   pos: Vec
   size: Vec
@@ -132,10 +142,12 @@ function removeEnemy(enemy) {
 }
 
 // GAME STATE
-let player = new Player()
-let enemyList: (Renderable & Updatable & HasHitbox)[] = []
-let objectList: (Renderable & Updatable)[] = [new Background, new Center, player]
-var timeToEnemySpawn = 0
+var player: Player
+var enemyList: (Renderable & Updatable & HasHitbox)[]
+var objectList: (Renderable & Updatable)[]
+var timeToEnemySpawn: number
+var timer: number
+var gameIsOver: boolean = true
 
 function spawnEnemy() {
   let theta = Math.random() * 2 * Math.PI
@@ -155,25 +167,33 @@ function update(delta: number) {
 }
 
 function gameOver() {
-  alert("Game over")
+  if (gameIsOver) return
+  clearInterval(timer)
+  gameIsOver = true
+  objectList.push(new GameOverText)
 }
 
-let canvas = document.getElementById("canvas") as HTMLCanvasElement
-let context = canvas.getContext("2d")
+function initGame() {
+  player = new Player()
+  enemyList = []
+  objectList = [new Background, new Center, player]
+  timeToEnemySpawn = 0
 
-function renderScreen() {
-  window.requestAnimationFrame(renderScreen)
-  objectList.forEach((r) => r.render(context, canvas.width, canvas.height))
+  var lastUpdate = Date.now()
+  timer = window.setInterval(() => {
+    let newNow = Date.now()
+    let delta = newNow - lastUpdate
+    lastUpdate = newNow
+    update(delta)
+  }, 1000/60)
+
+  gameIsOver = false
 }
-renderScreen()
 
-var lastUpdate = Date.now()
-window.setInterval(() => {
-  let newNow = Date.now()
-  let delta = newNow - lastUpdate
-  lastUpdate = newNow
-  update(delta)
-}, 1000/60)
+function resetGame() {
+  gameOver()
+  initGame()
+}
 
 let enumDirMap = {
   "ArrowLeft": Direction.Left,
@@ -190,13 +210,28 @@ let keysDown = {
 }
 
 let alertKey = (upOrDown: boolean) => (event: KeyboardEvent) => {
-  let dir = enumDirMap[event.code]
-  if (dir === undefined) return
-  keysDown[dir] = upOrDown
-  var addedDir = originVec
-  allDirections.forEach((dir) => { addedDir = addVecs(addedDir, keysDown[dir] ? dirVecMap[dir] : originVec) })
-  player.keysChanged(addedDir)
+  if (event.code == "KeyR" && !upOrDown) {
+    resetGame()
+  } else {
+    let dir = enumDirMap[event.code]
+    if (dir === undefined) return
+    keysDown[dir] = upOrDown
+    var addedDir = originVec
+    allDirections.forEach((dir) => { addedDir = addVecs(addedDir, keysDown[dir] ? dirVecMap[dir] : originVec) })
+    player.keysChanged(addedDir)
+  }
 }
 
 document.addEventListener("keydown", alertKey(true), false)
 document.addEventListener("keyup", alertKey(false), false)
+
+initGame()
+
+let canvas = document.getElementById("canvas") as HTMLCanvasElement
+let context = canvas.getContext("2d")
+
+function renderScreen() {
+  window.requestAnimationFrame(renderScreen)
+  objectList.forEach((r) => r.render(context, canvas.width, canvas.height))
+}
+renderScreen()
