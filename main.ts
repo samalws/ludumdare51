@@ -102,17 +102,21 @@ class Background implements Renderable, Updatable {
 
 class TextObj implements Renderable, Updatable {
   text: string
-  constructor(text: string) { this.text = text }
+  readonly height: number
+  constructor(text: string, height: number) {
+    this.text = text
+    this.height = height
+  }
   render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
     ctx.font = "48px sans-serif"
     ctx.fillStyle = "#E58F65"
-    ctx.fillText(this.text, 10, 50)
+    ctx.fillText(this.text, 10, this.height)
   }
   update(delta: number) {}
 }
 
 class ScoreObj extends TextObj {
-  constructor() { super("0") }
+  constructor() { super("0", 50) }
   update(delta: number) {
     this.text = "" + score
   }
@@ -387,7 +391,7 @@ function gameOver() {
   if (gameIsOver) return
   clearInterval(timer)
   gameIsOver = true
-  objectList.push(new TextObj("Game over! Press R to play again"))
+  objectList.push(new TextObj("Game over! Press R to play again", 100))
 }
 
 function initGame() {
@@ -412,7 +416,7 @@ function initGame() {
 function initTut() {
   player = new Player()
   enemyList = []
-  objectList = [new Background, new Center, player, new TextObj("Use arrow keys to move.\nDon't const any monsters get to the center.\nPress space to begin.")]
+  objectList = [new Background, new Center, player, new TextObj("Use arrow keys to move.", 50), new TextObj("Don't const any monsters get to the center.", 100), new TextObj("Press space to begin.", 150)]
   score = 0
   timeToEnemySpawn = 0
   gameIsOver = false
