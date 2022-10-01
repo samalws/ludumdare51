@@ -32,6 +32,8 @@ let dirVecMap = {
 let originVec: Vec = { x: 0, y: 0 }
 let centerVec: Vec = { x: 600, y: 600 }
 let radius = 500
+let innerRadius = 100
+let innerRadiusSq = innerRadius*innerRadius
 
 function addVecs(a: Vec, b: Vec): Vec {
   return { x: a.x + b.x, y: a.y + b.y }
@@ -152,12 +154,20 @@ class Center extends GameObject {
 }
 
 class Player extends GameObject {
+  relCenter: Vec
   constructor() {
-    super(centerVec, { x: 50, y: 50 }, originVec, "player")
+    let size = { x: 25, y: 25 }
+    super(addVecs(centerVec, { x: 0, y: innerRadius }), size, originVec, "player")
+    this.relCenter = subVecs(centerVec, mulVec(size, .5))
   }
   update(delta: number) {
     super.update(delta)
     enemyList.forEach((e) => { if (hitboxesCollide(this, e)) removeEnemy(e) })
+
+    let relPos = subVecs(this.pos, this.relCenter)
+    let distFromCenterSq = vecMagnitudeSq(relPos)
+    if (distFromCenterSq < innerRadiusSq)
+      this.pos = addVecs(this.relCenter, mulVec(relPos, innerRadius/Math.sqrt(distFromCenterSq)))
   }
   keysChanged(velNew: Vec) {
     this.vel = mulVec(velNew, 100/1000)
@@ -166,7 +176,7 @@ class Player extends GameObject {
 
 class BasicEnemy extends GameObject {
   constructor(pos: Vec) {
-    super(pos, { x: 50, y: 50 }, mulVec(unitVec(subVecs(centerVec, pos)), 10/1000), "enemy")
+    super(pos, { x: 50, y: 50 }, mulVec(unitVec(subVecs(centerVec, pos)), 50/1000), "enemy")
   }
 }
 
@@ -203,6 +213,7 @@ function update(delta: number) {
   timeToEnemySpawn -= delta
   if (timeToEnemySpawn <= 0) {
     timeToEnemySpawn = 1000 * 10
+    spawnEnemy()
     spawnEnemy()
   }
 }
