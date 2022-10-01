@@ -7,8 +7,8 @@ interface Updatable {
 }
 
 interface HasHitbox {
-  pos: Vec
-  size: Vec
+  readonly pos: Vec
+  readonly size: Vec
 }
 
 enum Direction {
@@ -20,31 +20,33 @@ enum Direction {
 
 const allDirections = [ Direction.Up, Direction.Down, Direction.Left, Direction.Right ]
 
-type Vec = { x: number, y: number }
+type Vec = { readonly x: number, readonly y: number }
+
+function vec(x: number, y: number): Vec { return { x, y } }
 
 const dirVecMap = {
-  [Direction.Left]: { x: -1, y: 0 },
-  [Direction.Right]: { x: 1, y: 0 },
-  [Direction.Up]: { x: 0, y: -1 },
-  [Direction.Down]: { x: 0, y: 1 },
+  [Direction.Left]: vec(-1, 0),
+  [Direction.Right]: vec(1, 0),
+  [Direction.Up]: vec(0, -1),
+  [Direction.Down]: vec(0, 1),
 }
 
-const originVec: Vec = { x: 0, y: 0 }
-const centerVec: Vec = { x: 600, y: 600 }
+const originVec: Vec = vec(0, 0)
+const centerVec: Vec = vec(600, 600)
 const radius = 500
 const innerRadius = 100
 const innerRadiusSq = innerRadius*innerRadius
 
 function addVecs(a: Vec, b: Vec): Vec {
-  return { x: a.x + b.x, y: a.y + b.y }
+  return vec(a.x + b.x, a.y + b.y)
 }
 
 function subVecs(a: Vec, b: Vec): Vec {
-  return { x: a.x - b.x, y: a.y - b.y }
+  return vec(a.x - b.x, a.y - b.y)
 }
 
 function mulVec(a: Vec, n: number): Vec {
-  return { x: a.x * n, y: a.y * n }
+  return vec(a.x * n, a.y * n)
 }
 
 function unitVec(a: Vec): Vec {
@@ -74,7 +76,7 @@ const imgs: { [name: string]: HTMLImageElement[] } = {}
 
 function loadImg(name: string, num: number) {
   const imgList: HTMLImageElement[] = []
-  for (var i = 1; i <= num; i++) {
+  for (let i = 1; i <= num; i++) {
     const img = new Image
     img.src = name + i + ".png"
     imgList.push(img)
@@ -115,12 +117,12 @@ class ScoreObj extends TextObj {
 
 class GameObject implements Renderable, Updatable, HasHitbox {
   pos: Vec
-  size: Vec
+  readonly size: Vec
   vel: Vec
-  imgs: HTMLImageElement[]
+  readonly imgs: HTMLImageElement[]
   imgIndex = 0
   frameCtr: number
-  invFramerate: number
+  readonly invFramerate: number
   constructor(pos: Vec, size: Vec, vel: Vec, imgName: string, framerateHz: number = 30) {
     this.pos = subVecs(pos, mulVec(size, .5))
     this.size = size
@@ -144,8 +146,7 @@ class GameObject implements Renderable, Updatable, HasHitbox {
 
 class Center extends GameObject {
   constructor() {
-    const size = { x: 10, y: 10 }
-    super(centerVec, { x: 10, y: 10 }, originVec, "center")
+    super(centerVec, vec(10, 10), originVec, "center")
   }
   update(delta: number) {
     super.update(delta)
@@ -156,8 +157,8 @@ class Center extends GameObject {
 class Player extends GameObject {
   relCenter: Vec
   constructor() {
-    const size = { x: 25, y: 25 }
-    super(addVecs(centerVec, { x: 0, y: innerRadius }), size, originVec, "player")
+    const size: Vec = vec(25, 25)
+    super(addVecs(centerVec, vec(0, innerRadius)), size, originVec, "player")
     this.relCenter = subVecs(centerVec, mulVec(size, .5))
   }
   update(delta: number) {
@@ -176,7 +177,7 @@ class Player extends GameObject {
 
 class BasicEnemy extends GameObject {
   constructor(pos: Vec) {
-    super(pos, { x: 50, y: 50 }, mulVec(unitVec(subVecs(centerVec, pos)), 50/1000), "enemy")
+    super(pos, vec(50, 50), mulVec(unitVec(subVecs(centerVec, pos)), 50/1000), "enemy")
   }
 }
 
@@ -191,18 +192,18 @@ function removeEnemy(enemy: Renderable & Updatable & HasHitbox) {
 }
 
 // GAME STATE
-var player: Player
-var enemyList: (Renderable & Updatable & HasHitbox)[]
-var objectList: (Renderable & Updatable)[]
-var score: number
-var timeToEnemySpawn: number
-var timer: number
-var gameIsOver: boolean = true
-var gameIsTut: boolean = false
+let player: Player
+let enemyList: (Renderable & Updatable & HasHitbox)[]
+let objectList: (Renderable & Updatable)[]
+let score: number
+let timeToEnemySpawn: number
+let timer: number
+let gameIsOver: boolean = true
+let gameIsTut: boolean = false
 
 function spawnEnemy() {
   const theta = Math.random() * 2 * Math.PI
-  const pos = addVecs(centerVec, { x: radius * Math.cos(theta), y: radius * Math.sin(theta) })
+  const pos = addVecs(centerVec, vec(radius * Math.cos(theta), radius * Math.sin(theta)))
   const enemy = new BasicEnemy(pos)
   enemyList.push(enemy)
   objectList.push(enemy)
@@ -232,7 +233,7 @@ function initGame() {
   score = 0
   timeToEnemySpawn = 0
 
-  var lastUpdate = Date.now()
+  let lastUpdate = Date.now()
   timer = window.setInterval(() => {
     const newNow = Date.now()
     const delta = newNow - lastUpdate
@@ -282,7 +283,7 @@ const alertKey = (upOrDown: boolean) => (event: KeyboardEvent) => {
     const dir = enumDirMap[event.code]
     if (dir === undefined) return
     keysDown[dir] = upOrDown
-    var addedDir = originVec
+    let addedDir = originVec
     allDirections.forEach((dir) => { addedDir = addVecs(addedDir, keysDown[dir] ? dirVecMap[dir] : originVec) })
     player.keysChanged(addedDir)
   }
