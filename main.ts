@@ -104,6 +104,13 @@ class TextObj implements Renderable, Updatable {
   update(delta: number) {}
 }
 
+class ScoreObj extends TextObj {
+  constructor() { super("0") }
+  update(delta: number) {
+    this.text = "" + score
+  }
+}
+
 class GameObject implements Renderable, Updatable, HasHitbox {
   pos: Vec
   size: Vec
@@ -170,12 +177,14 @@ function removeEnemy(enemy: Renderable & Updatable & HasHitbox) {
   let indexB = objectList.findIndex((e) => e === enemy)
   if (indexB !== undefined)
     objectList.splice(indexB, 1)
+  score += 1
 }
 
 // GAME STATE
 var player: Player
 var enemyList: (Renderable & Updatable & HasHitbox)[]
 var objectList: (Renderable & Updatable)[]
+var score: number
 var timeToEnemySpawn: number
 var timer: number
 var gameIsOver: boolean = true
@@ -208,7 +217,8 @@ function gameOver() {
 function initGame() {
   player = new Player()
   enemyList = []
-  objectList = [new Background, new Center, player]
+  objectList = [new Background, new ScoreObj, new Center, player]
+  score = 0
   timeToEnemySpawn = 0
 
   var lastUpdate = Date.now()
@@ -227,6 +237,7 @@ function initTut() {
   player = new Player()
   enemyList = []
   objectList = [new Background, new Center, player, new TextObj("Use arrow keys to move.\nDon't let any monsters get to the center.\nPress space to begin.")]
+  score = 0
   timeToEnemySpawn = 0
   gameIsOver = false
   gameIsTut = true
