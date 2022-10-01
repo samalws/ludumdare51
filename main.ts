@@ -18,22 +18,22 @@ enum Direction {
   Right,
 }
 
-let allDirections = [ Direction.Up, Direction.Down, Direction.Left, Direction.Right ]
+const allDirections = [ Direction.Up, Direction.Down, Direction.Left, Direction.Right ]
 
 type Vec = { x: number, y: number }
 
-let dirVecMap = {
+const dirVecMap = {
   [Direction.Left]: { x: -1, y: 0 },
   [Direction.Right]: { x: 1, y: 0 },
   [Direction.Up]: { x: 0, y: -1 },
   [Direction.Down]: { x: 0, y: 1 },
 }
 
-let originVec: Vec = { x: 0, y: 0 }
-let centerVec: Vec = { x: 600, y: 600 }
-let radius = 500
-let innerRadius = 100
-let innerRadiusSq = innerRadius*innerRadius
+const originVec: Vec = { x: 0, y: 0 }
+const centerVec: Vec = { x: 600, y: 600 }
+const radius = 500
+const innerRadius = 100
+const innerRadiusSq = innerRadius*innerRadius
 
 function addVecs(a: Vec, b: Vec): Vec {
   return { x: a.x + b.x, y: a.y + b.y }
@@ -48,7 +48,7 @@ function mulVec(a: Vec, n: number): Vec {
 }
 
 function unitVec(a: Vec): Vec {
-  let mag = vecMagnitude(a)
+  const mag = vecMagnitude(a)
   return mulVec(a, mag == 0 ? 0 : (1/mag))
 }
 
@@ -61,21 +61,21 @@ function vecMagnitude(a: Vec): number {
 }
 
 function hitboxesCollide(a: HasHitbox, b: HasHitbox): boolean {
-  let a1 = a.pos
-  let a2 = addVecs(a.pos, a.size)
-  let b1 = b.pos
-  let b2 = addVecs(b.pos, b.size)
-  let xInside = (a1.x <= b1.x && a2.x >= b1.x) || (a1.x >= b1.x && a1.x <= b2.x)
-  let yInside = (a1.y <= b1.y && a2.y >= b1.y) || (a1.y >= b1.y && a1.y <= b2.y)
+  const a1 = a.pos
+  const a2 = addVecs(a.pos, a.size)
+  const b1 = b.pos
+  const b2 = addVecs(b.pos, b.size)
+  const xInside = (a1.x <= b1.x && a2.x >= b1.x) || (a1.x >= b1.x && a1.x <= b2.x)
+  const yInside = (a1.y <= b1.y && a2.y >= b1.y) || (a1.y >= b1.y && a1.y <= b2.y)
   return xInside && yInside
 }
 
-let imgs: { [name: string]: HTMLImageElement[] } = {}
+const imgs: { [name: string]: HTMLImageElement[] } = {}
 
 function loadImg(name: string, num: number) {
-  let imgList: HTMLImageElement[] = []
+  const imgList: HTMLImageElement[] = []
   for (var i = 1; i <= num; i++) {
-    let img = new Image
+    const img = new Image
     img.src = name + i + ".png"
     imgList.push(img)
   }
@@ -144,7 +144,7 @@ class GameObject implements Renderable, Updatable, HasHitbox {
 
 class Center extends GameObject {
   constructor() {
-    let size = { x: 10, y: 10 }
+    const size = { x: 10, y: 10 }
     super(centerVec, { x: 10, y: 10 }, originVec, "center")
   }
   update(delta: number) {
@@ -156,7 +156,7 @@ class Center extends GameObject {
 class Player extends GameObject {
   relCenter: Vec
   constructor() {
-    let size = { x: 25, y: 25 }
+    const size = { x: 25, y: 25 }
     super(addVecs(centerVec, { x: 0, y: innerRadius }), size, originVec, "player")
     this.relCenter = subVecs(centerVec, mulVec(size, .5))
   }
@@ -164,8 +164,8 @@ class Player extends GameObject {
     super.update(delta)
     enemyList.forEach((e) => { if (hitboxesCollide(this, e)) removeEnemy(e) })
 
-    let relPos = subVecs(this.pos, this.relCenter)
-    let distFromCenterSq = vecMagnitudeSq(relPos)
+    const relPos = subVecs(this.pos, this.relCenter)
+    const distFromCenterSq = vecMagnitudeSq(relPos)
     if (distFromCenterSq < innerRadiusSq)
       this.pos = addVecs(this.relCenter, mulVec(relPos, innerRadius/Math.sqrt(distFromCenterSq)))
   }
@@ -181,10 +181,10 @@ class BasicEnemy extends GameObject {
 }
 
 function removeEnemy(enemy: Renderable & Updatable & HasHitbox) {
-  let indexA = enemyList.findIndex((e) => e === enemy)
+  const indexA = enemyList.findIndex((e) => e === enemy)
   if (indexA !== undefined)
     enemyList.splice(indexA, 1)
-  let indexB = objectList.findIndex((e) => e === enemy)
+  const indexB = objectList.findIndex((e) => e === enemy)
   if (indexB !== undefined)
     objectList.splice(indexB, 1)
   score += 1
@@ -201,9 +201,9 @@ var gameIsOver: boolean = true
 var gameIsTut: boolean = false
 
 function spawnEnemy() {
-  let theta = Math.random() * 2 * Math.PI
-  let pos = addVecs(centerVec, { x: radius * Math.cos(theta), y: radius * Math.sin(theta) })
-  let enemy = new BasicEnemy(pos)
+  const theta = Math.random() * 2 * Math.PI
+  const pos = addVecs(centerVec, { x: radius * Math.cos(theta), y: radius * Math.sin(theta) })
+  const enemy = new BasicEnemy(pos)
   enemyList.push(enemy)
   objectList.push(enemy)
 }
@@ -234,8 +234,8 @@ function initGame() {
 
   var lastUpdate = Date.now()
   timer = window.setInterval(() => {
-    let newNow = Date.now()
-    let delta = newNow - lastUpdate
+    const newNow = Date.now()
+    const delta = newNow - lastUpdate
     lastUpdate = newNow
     update(delta)
   }, 1000/60)
@@ -247,7 +247,7 @@ function initGame() {
 function initTut() {
   player = new Player()
   enemyList = []
-  objectList = [new Background, new Center, player, new TextObj("Use arrow keys to move.\nDon't let any monsters get to the center.\nPress space to begin.")]
+  objectList = [new Background, new Center, player, new TextObj("Use arrow keys to move.\nDon't const any monsters get to the center.\nPress space to begin.")]
   score = 0
   timeToEnemySpawn = 0
   gameIsOver = false
@@ -259,27 +259,27 @@ function resetGame() {
   initGame()
 }
 
-let enumDirMap: { [s: string]: Direction } = {
+const enumDirMap: { [s: string]: Direction } = {
   "ArrowLeft": Direction.Left,
   "ArrowRight": Direction.Right,
   "ArrowUp": Direction.Up,
   "ArrowDown": Direction.Down,
 }
 
-let keysDown = {
+const keysDown = {
   [Direction.Left]: false,
   [Direction.Right]: false,
   [Direction.Up]: false,
   [Direction.Down]: false,
 }
 
-let alertKey = (upOrDown: boolean) => (event: KeyboardEvent) => {
+const alertKey = (upOrDown: boolean) => (event: KeyboardEvent) => {
   if (event.code == "KeyR" && !upOrDown && !gameIsTut) {
     resetGame()
   } else if (event.code == "Space" && !upOrDown && gameIsTut) {
     resetGame()
   } else {
-    let dir = enumDirMap[event.code]
+    const dir = enumDirMap[event.code]
     if (dir === undefined) return
     keysDown[dir] = upOrDown
     var addedDir = originVec
