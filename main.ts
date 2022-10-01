@@ -30,7 +30,7 @@ let dirVecMap = {
 }
 
 let originVec: Vec = { x: 0, y: 0 }
-let centerVec: Vec = { x: 500, y: 500 }
+let centerVec: Vec = { x: 600, y: 600 }
 let radius = 500
 
 function addVecs(a: Vec, b: Vec): Vec {
@@ -92,7 +92,7 @@ class GameObject implements Renderable, Updatable, HasHitbox {
   size: Vec
   vel: Vec
   color: string
-  constructor(pos, size, vel, color) { this.pos = pos; this.size = size; this.vel = vel; this.color = color }
+  constructor(pos, size, vel, color) { this.pos = subVecs(pos, mulVec(size, .5)); this.size = size; this.vel = vel; this.color = color }
   render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
     ctx.fillStyle = this.color
     ctx.fillRect(this.pos.x, this.pos.y, this.size.x, this.size.y)
@@ -105,7 +105,7 @@ class GameObject implements Renderable, Updatable, HasHitbox {
 class Center extends GameObject {
   constructor() {
     let size = { x: 10, y: 10 }
-    super(subVecs(centerVec, mulVec(size, .5)), size, originVec, "rgb(0, 0, 200)")
+    super(centerVec, { x: 10, y: 10 }, originVec, "rgb(0, 0, 200)")
   }
   update(delta: number) {
     super.update(delta)
