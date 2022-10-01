@@ -77,12 +77,13 @@ class Background implements Renderable, Updatable {
   update(delta: number) {}
 }
 
-class GameOverText implements Renderable, Updatable {
-  constructor() {}
+class TextObj implements Renderable, Updatable {
+  text: string
+  constructor(text: string) { this.text = text }
   render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
     ctx.font = "48px sans-serif"
     ctx.fillStyle = "rgb(200, 0, 0)"
-    ctx.fillText("Game over! Press R to play again", 10, 50)
+    ctx.fillText(this.text, 10, 50)
   }
   update(delta: number) {}
 }
@@ -148,6 +149,7 @@ var objectList: (Renderable & Updatable)[]
 var timeToEnemySpawn: number
 var timer: number
 var gameIsOver: boolean = true
+var gameIsTut: boolean = false
 
 function spawnEnemy() {
   let theta = Math.random() * 2 * Math.PI
@@ -170,7 +172,7 @@ function gameOver() {
   if (gameIsOver) return
   clearInterval(timer)
   gameIsOver = true
-  objectList.push(new GameOverText)
+  objectList.push(new TextObj("Game over! Press R to play again"))
 }
 
 function initGame() {
@@ -188,6 +190,16 @@ function initGame() {
   }, 1000/60)
 
   gameIsOver = false
+  gameIsTut = false
+}
+
+function initTut() {
+  player = new Player()
+  enemyList = []
+  objectList = [new Background, new Center, player, new TextObj("Use arrow keys to move.\nDon't let any monsters get to the center.\nPress space to begin.")]
+  timeToEnemySpawn = 0
+  gameIsOver = false
+  gameIsTut = true
 }
 
 function resetGame() {
@@ -210,7 +222,10 @@ let keysDown = {
 }
 
 let alertKey = (upOrDown: boolean) => (event: KeyboardEvent) => {
-  if (event.code == "KeyR" && !upOrDown) {
+  console.log(event.code)
+  if (event.code == "KeyR" && !upOrDown && !gameIsTut) {
+    resetGame()
+  } else if (event.code == "Space" && !upOrDown && gameIsTut) {
     resetGame()
   } else {
     let dir = enumDirMap[event.code]
@@ -225,7 +240,7 @@ let alertKey = (upOrDown: boolean) => (event: KeyboardEvent) => {
 document.addEventListener("keydown", alertKey(true), false)
 document.addEventListener("keyup", alertKey(false), false)
 
-initGame()
+initTut()
 
 let canvas = document.getElementById("canvas") as HTMLCanvasElement
 let context = canvas.getContext("2d")
