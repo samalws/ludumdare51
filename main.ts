@@ -202,11 +202,13 @@ class GameObject implements Renderable, Updatable, HasHitbox {
   readonly img: HTMLImageElement
   static readonly particleTimeFull = .05 * 1000
   timeToParticle = GameObject.particleTimeFull
-  constructor(pos: Vec, vel: Vec, imgName: string, framerateHz: number = 30) {
+  readonly particleSpeed: number
+  constructor(pos: Vec, vel: Vec, imgName: string, particleSpeed: number = 300/1000) {
     this.pos = pos
     this.vel = vel
     this.setVel(vel)
     this.img = imgs[imgName]
+    this.particleSpeed = particleSpeed
   }
   imgAngle = 0
   render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
@@ -226,7 +228,7 @@ class GameObject implements Renderable, Updatable, HasHitbox {
       if (velMagSq > epsilon) {
         const negVelUnit = mulVec(this.vel, -1/Math.sqrt(velMagSq))
         const particlePos = addVecs(this.pos, mulVec(negVelUnit, this.getRadius()))
-        const particleVel = mulVec(negVelUnit, 300/1000)
+        const particleVel = mulVec(negVelUnit, this.particleSpeed)
         objectList.splice(1,0,new Particle(particlePos, particleVel))
       }
       this.timeToParticle = GameObject.particleTimeFull
@@ -295,8 +297,8 @@ function velCenterBlend(pos: Vec, towardsSpeed: number, perpSpeed: number) {
 
 class Enemy extends GameObject {
   givesPoints = true
-  constructor(pos: Vec, vel: Vec, imgName: string, framerateHz: number = 30) {
-    super(pos, vel, imgName, framerateHz)
+  constructor(pos: Vec, vel: Vec, imgName: string, particleSpeed: number = 300/1000) {
+    super(pos, vel, imgName, particleSpeed)
   }
 }
 
@@ -382,8 +384,6 @@ class GreyGooEnemy extends Enemy {
     if (this.timeToNewSpawn <= 0) {
       spawnEnemy(greyGooEnemy(this.spawnsLeft-1), addVecs(this.pos, randomRadiusVec(50)))
       this.timeToNewSpawn = GreyGooEnemy.spawnTimeFull
-
-      playSfx("greyGoo")
     }
   }
 }
@@ -437,6 +437,8 @@ class TpEnemy extends Enemy {
       this.pos = addVecs(this.pos, velCenterBlend(this.pos, 50, 100))
       this.setVel(velTowardsCenter(this.pos, 50/1000))
       this.timeToTp = TpEnemy.tpTimeFull
+
+      playSfx("greyGoo")
     }
   }
 }
@@ -448,7 +450,7 @@ class ProtoBasicEnemy extends Enemy { // don't add to enemyList
   timeToUpdate = 0
   static readonly updateTimeFull = 1000 / 10
   constructor(pos: Vec, targetPos: Vec) {
-    super(pos, originVec, "protoBasicEnemy")
+    super(pos, originVec, "protoBasicEnemy", 0)
     this.targetPos = targetPos
     this.givesPoints = false
   }
@@ -456,7 +458,7 @@ class ProtoBasicEnemy extends Enemy { // don't add to enemyList
     super.update(delta)
     this.timeToUpdate -= delta.delta
     if (this.timeToUpdate <= 0) {
-      this.setVel(mulVec(unitVec(subVecs(this.targetPos, this.pos)), 1000/1000))
+      this.setVel(mulVec(unitVec(subVecs(this.targetPos, this.pos)), 250/1000))
       this.timeToUpdate = ProtoBasicEnemy.updateTimeFull
     }
     if (vecMagnitudeSq(subVecs(this.pos, this.targetPos)) < 50*50) {
@@ -509,10 +511,16 @@ function update(delta: Delta) {
   if (timeToEnemySpawn <= 0) {
     timeToEnemySpawn = 1000 * 10
 
-    if (score == 0) {
+    if (score == 0)
       spawnEnemy(basicEnemy)
+    else if (score == 1) {
+      spawnEnemy(swirlEnemy)
+      spawnEnemy(tpEnemy)
+    } else if (score == 2 || score == 3) {
+      spawnEnemy(scaredEnemy)
+      spawnEnemy(tpEnemy)
     } else {
-      const numSpawns = (score < 4) ? 1 : (score < 16) ? 2 : (score < 64) ? 3 : 4
+      const numSpawns = (score < 16) ? 2 : (score < 64) ? 3 : 4
       for (let i = 0; i < numSpawns; i++) {
         const rng = Math.random()
         if (rng < 1/7)
