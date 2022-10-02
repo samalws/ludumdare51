@@ -658,7 +658,6 @@ context.save()
 
 let maxRenderTime = 0
 function renderScreen() {
-  window.requestAnimationFrame(renderScreen)
   const before = Date.now()
   try {
     objectList.forEach((r) => {
@@ -670,6 +669,8 @@ function renderScreen() {
     console.error(err)
   }
   maxRenderTime = Math.max(maxRenderTime, Date.now() - before)
+
+  window.requestAnimationFrame(renderScreen)
 }
 renderScreen()
 
