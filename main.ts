@@ -508,24 +508,29 @@ function update(delta: Delta) {
   timeToEnemySpawn -= delta.delta
   if (timeToEnemySpawn <= 0) {
     timeToEnemySpawn = 1000 * 10
-    const numSpawns = (score < 3) ? 1 : (score < 15) ? 2 : (score < 30) ? 3 : 4
-    for (let i = 0; i < numSpawns; i++) {
-      const rng = Math.random()
-      if (rng < 1/7)
-        spawnEnemy(wizEnemy)
-      else if (rng < 2/7)
-        spawnEnemy(waitingEnemy)
-      else if (rng < 3/6)
-        spawnEnemy(greyGooEnemyDeflt)
-      else if (rng < 4/7)
-        spawnEnemy(scaredEnemy)
-      else if (rng < 5/7)
-        spawnEnemy(swirlEnemy)
-      else if (rng < 6/7)
-        spawnEnemy(tpEnemy)
-      else {
-        spawnEnemy(basicEnemy)
-        spawnEnemy(basicEnemy)
+
+    if (score == 0) {
+      spawnEnemy(basicEnemy)
+    } else {
+      const numSpawns = (score < 4) ? 1 : (score < 16) ? 2 : (score < 64) ? 3 : 4
+      for (let i = 0; i < numSpawns; i++) {
+        const rng = Math.random()
+        if (rng < 1/7)
+          spawnEnemy(wizEnemy)
+        else if (rng < 2/7)
+          spawnEnemy(waitingEnemy)
+        else if (rng < 3/6)
+          spawnEnemy(greyGooEnemyDeflt)
+        else if (rng < 4/7)
+          spawnEnemy(scaredEnemy)
+        else if (rng < 5/7)
+          spawnEnemy(swirlEnemy)
+        else if (rng < 6/7)
+          spawnEnemy(tpEnemy)
+        else {
+          spawnEnemy(basicEnemy)
+          spawnEnemy(basicEnemy)
+        }
       }
     }
   }
@@ -564,7 +569,15 @@ function initGame() {
 function initTut() {
   player = new Player()
   enemyList = []
-  objectList = [new Background, new Center, player, new TextObj("Use arrow keys to move.", 50), new TextObj("Don't let any enemies get to the center.", 100), new TextObj("Press space to begin.", 150)]
+  objectList = [
+    new Background,
+    new Center,
+    player,
+    new TextObj("Use arrow keys to move.", 50),
+    new TextObj("Don't let any enemies get to the center.", 100),
+    new TextObj("Touch an enemy to kill it.", 150),
+    new TextObj("Press space to begin.", 200)
+  ]
   score = 0
   timeToEnemySpawn = 0
   gameIsOver = false
