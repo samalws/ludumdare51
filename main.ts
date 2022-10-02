@@ -3,7 +3,7 @@ interface Renderable {
 }
 
 interface Updatable {
-  update: (delta: number) => void
+  update: (delta: Delta) => void
 }
 
 interface HasHitbox {
@@ -91,13 +91,28 @@ loadImg("swirlEnemy")
 loadImg("tpEnemy")
 loadImg("center")
 
+class Delta {
+  static readonly rotMul = 1*(Math.PI/180)/1000
+  readonly delta: number
+  readonly cosRot: number
+  readonly sinRot: number
+  constructor(delta: number) {
+    this.delta = delta
+    this.cosRot = Math.cos(delta*Delta.rotMul)
+    this.sinRot = Math.sin(delta*Delta.rotMul)
+  }
+  rotateVec(v: Vec): Vec {
+    return vec(v.x * this.cosRot - v.y * this.sinRot, v.x * this.sinRot + v.y * this.cosRot)
+  }
+}
+
 class Background implements Renderable, Updatable {
   constructor() {}
   render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
     ctx.fillStyle = "#2A324B"
     ctx.fillRect(0, 0, xSize, ySize)
   }
-  update(delta: number) {}
+  update(delta: Delta) {}
 }
 
 class TextObj implements Renderable, Updatable {
@@ -112,12 +127,12 @@ class TextObj implements Renderable, Updatable {
     ctx.fillStyle = "#E58F65"
     ctx.fillText(this.text, 10, this.height)
   }
-  update(delta: number) {}
+  update(delta: Delta) {}
 }
 
 class ScoreObj extends TextObj {
   constructor() { super("0", 50) }
-  update(delta: number) {
+  update(delta: Delta) {
     this.text = "" + score
   }
 }
@@ -142,8 +157,9 @@ class GameObject implements Renderable, Updatable, HasHitbox {
     ctx.drawImage(this.img, -this.img.width*.5, -this.img.height*.5)
     ctx.restore()
   }
-  update(delta: number) {
-    this.pos = addVecs(this.pos, mulVec(this.vel, delta))
+  update(delta: Delta) {
+    this.pos = addVecs(this.pos, mulVec(this.vel, delta.delta))
+    this.pos = addVecs(centerVec, delta.rotateVec(subVecs(this.pos, centerVec)))
   }
   setVel(newVel: Vec) {
     this.vel = newVel
@@ -160,7 +176,7 @@ class Center extends GameObject {
   constructor() {
     super(centerVec, originVec, "center")
   }
-  update(delta: number) {
+  update(delta: Delta) {
     super.update(delta)
     enemyList.forEach((e) => { if (hitboxesCollide(this, e)) gameOver() })
   }
@@ -172,7 +188,7 @@ class Player extends GameObject {
   constructor() {
     super(addVecs(centerVec, vec(0, innerRadius)), originVec, "player")
   }
-  update(delta: number) {
+  update(delta: Delta) {
     super.update(delta)
     enemyList.forEach((e) => { if (hitboxesCollide(this, e)) removeEnemy(e) })
 
@@ -210,8 +226,18 @@ class Enemy extends GameObject {
 }
 
 class BasicEnemy extends Enemy {
+  timeToUpdate = 0
+  static readonly updateTimeFull = 1000 / 10
   constructor(pos: Vec) {
-    super(pos, velTowardsCenter(pos, 50/1000), "enemy")
+    super(pos, originVec, "enemy")
+  }
+  update(delta: Delta) {
+    super.update(delta)
+    this.timeToUpdate -= delta.delta
+    if (this.timeToUpdate <= 0) {
+      this.setVel(velTowardsCenter(this.pos, 50/1000))
+      this.timeToUpdate = BasicEnemy.updateTimeFull
+    }
   }
 }
 
@@ -222,10 +248,10 @@ class WaitingEnemy extends Enemy {
   constructor(pos: Vec) {
     super(pos, originVec, "waitingEnemy")
   }
-  update(delta: number) {
+  update(delta: Delta) {
     super.update(delta)
     if (this.timeLeft <= 0) return
-    this.timeLeft -= delta
+    this.timeLeft -= delta.delta
     if (this.timeLeft > 0) return
     this.setVel(velTowardsCenter(this.pos, 70/1000))
   }
@@ -239,8 +265,8 @@ class WizEnemy extends Enemy {
   constructor(pos: Vec) {
     super(pos, originVec, "wizEnemy")
   }
-  update(delta: number) {
-    this.timeToNewSpawn -= delta
+  update(delta: Delta) {
+    this.timeToNewSpawn -= delta.delta
     if (this.timeToNewSpawn <= 0) {
       // TODO animate
       spawnEnemy(basicEnemy)
@@ -252,19 +278,30 @@ class WizEnemy extends Enemy {
 const wizEnemy = (pos: Vec) => new WizEnemy(pos)
 
 class GreyGooEnemy extends Enemy {
+  timeToUpdate = 0
+  static readonly updateTimeFull = 1000 / 10
+
   static readonly spawnTimeFull = 1000 * 5
   timeToNewSpawn = GreyGooEnemy.spawnTimeFull
   static readonly defltSpawnsLeft = 10
   readonly spawnsLeft: number
+
   constructor(pos: Vec, spawnsLeft: number) {
-    super(pos, velTowardsCenter(pos, 10/1000), "greyGooEnemy")
+    super(pos, originVec, "greyGooEnemy")
     this.spawnsLeft = spawnsLeft
     this.givesPoints = spawnsLeft == GreyGooEnemy.defltSpawnsLeft
   }
-  update(delta: number) {
+  update(delta: Delta) {
     super.update(delta)
+
+    this.timeToUpdate -= delta.delta
+    if (this.timeToUpdate <= 0) {
+      this.setVel(velTowardsCenter(this.pos, 10/1000))
+      this.timeToUpdate = GreyGooEnemy.updateTimeFull
+    }
+
     if (this.spawnsLeft == 0) return
-    this.timeToNewSpawn -= delta
+    this.timeToNewSpawn -= delta.delta
     if (this.timeToNewSpawn <= 0) {
       spawnEnemy(greyGooEnemy(this.spawnsLeft-1), addVecs(this.pos, randomRadiusVec(50)))
       this.timeToNewSpawn = GreyGooEnemy.spawnTimeFull
@@ -276,19 +313,15 @@ const greyGooEnemy = (spawnsLeft: number) => (pos: Vec) => new GreyGooEnemy(pos,
 const greyGooEnemyDeflt = greyGooEnemy(GreyGooEnemy.defltSpawnsLeft)
 
 class ScaredEnemy extends Enemy {
-  readonly towardsVec: Vec
-  readonly awayVec: Vec
   constructor(pos: Vec) {
-    super(pos, velTowardsCenter(pos, 50/1000), "scaredEnemy")
-    this.towardsVec = this.vel
-    this.awayVec = velTowardsCenter(pos, -60/1000)
+    super(pos, originVec, "scaredEnemy")
   }
-  update(delta: number) {
+  update(delta: Delta) {
     super.update(delta)
     if (vecMagnitudeSq(subVecs(player.pos, this.pos)) < 100*100)
-      this.setVel(this.awayVec)
+      this.setVel(velTowardsCenter(this.pos, -60/1000))
     else
-      this.setVel(this.towardsVec)
+      this.setVel(velTowardsCenter(this.pos, 50/1000))
   }
 }
 
@@ -300,9 +333,9 @@ class SwirlEnemy extends Enemy {
   constructor(pos: Vec) {
     super(pos, originVec, "swirlEnemy")
   }
-  update(delta: number) {
+  update(delta: Delta) {
     super.update(delta)
-    this.timeToUpdate -= delta
+    this.timeToUpdate -= delta.delta
     if (this.timeToUpdate <= 0) {
       this.setVel(velCenterBlend(this.pos, 50/1000, 100/1000))
       this.timeToUpdate = SwirlEnemy.updateTimeFull
@@ -318,9 +351,9 @@ class TpEnemy extends Enemy {
   constructor(pos: Vec) {
     super(pos, velTowardsCenter(pos, 50/1000), "tpEnemy")
   }
-  update(delta: number) {
+  update(delta: Delta) {
     super.update(delta)
-    this.timeToTp -= delta
+    this.timeToTp -= delta.delta
     if (this.timeToTp <= 0) {
       this.pos = addVecs(this.pos, velCenterBlend(this.pos, 50, 100))
       this.setVel(velTowardsCenter(this.pos, 50/1000))
@@ -359,9 +392,9 @@ function spawnEnemy(ctor: (v: Vec) => Enemy, pos?: Vec) {
   objectList.push(enemy)
 }
 
-function update(delta: number) {
+function update(delta: Delta) {
   objectList.forEach((r) => r.update(delta))
-  timeToEnemySpawn -= delta
+  timeToEnemySpawn -= delta.delta
   if (timeToEnemySpawn <= 0) {
     timeToEnemySpawn = 1000 * 10
     const numSpawnsDec = Math.floor(Math.random() * 2)
@@ -404,7 +437,7 @@ function initGame() {
   let lastUpdate = Date.now()
   timer = window.setInterval(() => {
     const newNow = Date.now()
-    const delta = newNow - lastUpdate
+    const delta = new Delta(newNow - lastUpdate)
     lastUpdate = newNow
     update(delta)
   }, 1000/60)
