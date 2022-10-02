@@ -83,13 +83,14 @@ function loadImg(name: string) {
 }
 
 loadImg("player")
-loadImg("enemy")
+loadImg("basicEnemy")
 loadImg("waitingEnemy")
 loadImg("wizEnemy")
 loadImg("greyGooEnemy")
 loadImg("scaredEnemy")
 loadImg("swirlEnemy")
 loadImg("tpEnemy")
+loadImg("protoBasicEnemy")
 loadImg("center")
 
 class Delta {
@@ -290,7 +291,7 @@ class BasicEnemy extends Enemy {
   timeToUpdate = 0
   static readonly updateTimeFull = 1000 / 10
   constructor(pos: Vec) {
-    super(pos, originVec, "enemy")
+    super(pos, originVec, "basicEnemy")
   }
   update(delta: Delta) {
     super.update(delta)
@@ -330,8 +331,7 @@ class WizEnemy extends Enemy {
     super.update(delta)
     this.timeToNewSpawn -= delta.delta
     if (this.timeToNewSpawn <= 0) {
-      // TODO animate
-      spawnEnemy(basicEnemy)
+      objectList.splice(1,0,new ProtoBasicEnemy(this.pos, addVecs(centerVec, randomRadiusVec(outerRadius))))
       this.timeToNewSpawn = WizEnemy.spawnTimeFull
     }
   }
@@ -426,9 +426,32 @@ class TpEnemy extends Enemy {
 
 const tpEnemy = (pos: Vec) => new TpEnemy(pos)
 
+class ProtoBasicEnemy extends Enemy { // don't add to enemyList
+  readonly targetPos: Vec
+  timeToUpdate = 0
+  static readonly updateTimeFull = 1000 / 10
+  constructor(pos: Vec, targetPos: Vec) {
+    super(pos, originVec, "protoBasicEnemy")
+    this.targetPos = targetPos
+    this.givesPoints = false
+  }
+  update(delta: Delta) {
+    super.update(delta)
+    this.timeToUpdate -= delta.delta
+    if (this.timeToUpdate <= 0) {
+      this.setVel(mulVec(unitVec(subVecs(this.targetPos, this.pos)), 1000/1000))
+      this.timeToUpdate = ProtoBasicEnemy.updateTimeFull
+    }
+    if (vecMagnitudeSq(subVecs(this.pos, this.targetPos)) < 50*50) {
+      spawnEnemy(basicEnemy, this.targetPos)
+      removeEnemy(this)
+    }
+  }
+}
+
 function removeFromList<T>(x: T, l: T[]) {
   const index = l.findIndex((e) => e === x)
-  if (index !== undefined)
+  if (index !== undefined && index !== -1)
     l.splice(index, 1)
 }
 
@@ -437,9 +460,10 @@ function removeEnemy(enemy: Enemy) {
   removeFromList(enemy, objectList)
   if (enemy.givesPoints)
     score += 1
+  // explode
   for (let i = 0; i < 50; i++) {
     const radVec = randomRadiusVec(1)
-    objectList.splice(2, 0, new Particle(addVecs(enemy.pos, mulVec(radVec, 20)), mulVec(radVec, 300/1000)))
+    objectList.splice(1, 0, new Particle(addVecs(enemy.pos, mulVec(radVec, 20)), mulVec(radVec, 300/1000)))
   }
 }
 
