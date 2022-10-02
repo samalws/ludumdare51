@@ -148,12 +148,50 @@ class ScoreObj extends TextObj {
   }
 }
 
+class Particle implements Renderable, Updatable {
+  pos: Vec
+  angle: number
+  readonly vel: Vec
+  readonly angVel: number
+  lifetime: number
+  static readonly angVelMax = 2/1000
+  static readonly lifetimeMax = .1*1000
+  static readonly colors = ["#ff000055", "#ff880055"] // TODO
+  color: string
+  constructor(pos: Vec, vel: Vec) {
+    this.pos = pos
+    this.vel = vel
+    this.angle = Math.random() * 2 * Math.PI
+    this.angVel = Math.random() * 2 * Particle.angVelMax - Particle.angVelMax
+    this.lifetime = Math.random() * Particle.lifetimeMax
+    this.color = Particle.colors[Math.floor(Math.random() * Particle.colors.length)]
+  }
+  render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
+    ctx.save()
+    ctx.translate(this.pos.x, this.pos.y)
+    ctx.rotate(this.angle)
+    ctx.fillStyle = this.color
+    ctx.fillRect(-10, -10, 20, 20)
+    ctx.restore()
+  }
+  update(delta: Delta) {
+    this.pos = addVecs(this.pos, mulVec(this.vel, delta.delta))
+    this.angle += this.angVel * delta.delta
+    this.lifetime -= delta.delta
+    if (this.lifetime < 0)
+      removeFromList(this, objectList)
+  }
+}
+
 const imgWidthToRadius = .5*Math.sqrt(2)
+const epsilon = .0001
 
 class GameObject implements Renderable, Updatable, HasHitbox {
   pos: Vec
   vel: Vec
   readonly img: HTMLImageElement
+  static readonly particleTimeFull = .05 * 1000
+  timeToParticle = GameObject.particleTimeFull
   constructor(pos: Vec, vel: Vec, imgName: string, framerateHz: number = 30) {
     this.pos = pos
     this.vel = vel
@@ -171,10 +209,22 @@ class GameObject implements Renderable, Updatable, HasHitbox {
   update(delta: Delta) {
     this.pos = addVecs(this.pos, mulVec(this.vel, delta.delta))
     this.pos = addVecs(centerVec, delta.rotateVec(subVecs(this.pos, centerVec)))
+
+    this.timeToParticle -= delta.delta
+    if (this.timeToParticle <= 0) {
+      const velMagSq = vecMagnitudeSq(this.vel)
+      if (velMagSq > epsilon) {
+        const negVelUnit = mulVec(this.vel, -1/Math.sqrt(velMagSq))
+        const particlePos = addVecs(this.pos, mulVec(negVelUnit, this.getRadius()))
+        const particleVel = mulVec(negVelUnit, 300/1000)
+        objectList.splice(1,0,new Particle(particlePos, particleVel))
+      }
+      this.timeToParticle = GameObject.particleTimeFull
+    }
   }
   setVel(newVel: Vec) {
     this.vel = newVel
-    if (vecMagnitudeSq(newVel) > .0001)
+    if (vecMagnitudeSq(newVel) > epsilon)
       this.imgAngle = Math.atan2(newVel.x, -newVel.y)
     // TODO when youre moving diagonally and then release both the sprite becomes horizontal
   }
@@ -376,15 +426,21 @@ class TpEnemy extends Enemy {
 
 const tpEnemy = (pos: Vec) => new TpEnemy(pos)
 
+function removeFromList<T>(x: T, l: T[]) {
+  const index = l.findIndex((e) => e === x)
+  if (index !== undefined)
+    l.splice(index, 1)
+}
+
 function removeEnemy(enemy: Enemy) {
-  const indexA = enemyList.findIndex((e) => e === enemy)
-  if (indexA !== undefined)
-    enemyList.splice(indexA, 1)
-  const indexB = objectList.findIndex((e) => e === enemy)
-  if (indexB !== undefined)
-    objectList.splice(indexB, 1)
+  removeFromList(enemy, enemyList)
+  removeFromList(enemy, objectList)
   if (enemy.givesPoints)
     score += 1
+  for (let i = 0; i < 50; i++) {
+    const radVec = randomRadiusVec(1)
+    objectList.splice(2, 0, new Particle(addVecs(enemy.pos, mulVec(radVec, 20)), mulVec(radVec, 300/1000)))
+  }
 }
 
 // GAME STATE
