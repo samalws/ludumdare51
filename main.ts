@@ -31,8 +31,9 @@ const dirVecMap = {
   [Direction.Down]: vec(0, 1),
 }
 
-const originVec: Vec = vec(0, 0)
-const centerVec: Vec = vec(600, 600)
+const canvasSize = vec(1200, 1200)
+const originVec = vec(0, 0)
+const centerVec = vec(600, 600)
 const outerRadius = 500
 const innerRadius = 50
 const innerRadiusSq = innerRadius*innerRadius
@@ -106,11 +107,21 @@ class Delta {
   }
 }
 
+function genBackgroundStars(): Vec[] {
+  const stars: Vec[] = []
+  for (let i = 0; i < 500; i++)
+    stars.push(vec(Math.random() * canvasSize.x, Math.random() * canvasSize.y))
+  return stars
+}
+
 class Background implements Renderable, Updatable {
+  static readonly stars = genBackgroundStars()
   constructor() {}
   render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
     ctx.fillStyle = "#2A324B"
     ctx.fillRect(0, 0, xSize, ySize)
+    ctx.fillStyle = "#FFFFFF"
+    Background.stars.forEach((s) => ctx.fillRect(s.x, s.y, 2, 2))
   }
   update(delta: Delta) {}
 }
@@ -186,7 +197,7 @@ const oneOverSqrt2 = 1/Math.sqrt(2)
 
 class Player extends GameObject {
   constructor() {
-    super(addVecs(centerVec, vec(0, innerRadius)), originVec, "player")
+    super(addVecs(centerVec, vec(0, innerRadius + 50)), originVec, "player")
   }
   update(delta: Delta) {
     super.update(delta)
@@ -266,6 +277,7 @@ class WizEnemy extends Enemy {
     super(pos, originVec, "wizEnemy")
   }
   update(delta: Delta) {
+    super.update(delta)
     this.timeToNewSpawn -= delta.delta
     if (this.timeToNewSpawn <= 0) {
       // TODO animate
@@ -424,7 +436,7 @@ function gameOver() {
   if (gameIsOver) return
   clearInterval(timer)
   gameIsOver = true
-  objectList.push(new TextObj("Game over! Press R to play again", 100))
+  objectList.push(new TextObj("Game over! Press R to play again.", 100))
 }
 
 function initGame() {
@@ -449,7 +461,7 @@ function initGame() {
 function initTut() {
   player = new Player()
   enemyList = []
-  objectList = [new Background, new Center, player, new TextObj("Use arrow keys to move.", 50), new TextObj("Don't let any monsters get to the center.", 100), new TextObj("Press space to begin.", 150)]
+  objectList = [new Background, new Center, player, new TextObj("Use arrow keys to move.", 50), new TextObj("Don't let any enemies get to the center.", 100), new TextObj("Press space to begin.", 150)]
   score = 0
   timeToEnemySpawn = 0
   gameIsOver = false
