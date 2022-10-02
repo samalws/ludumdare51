@@ -505,7 +505,10 @@ function spawnEnemy(ctor: (v: Vec) => Enemy, pos?: Vec) {
   playSfx("enemySpawn")
 }
 
+let maxUpdateTime = 0
 function update(delta: Delta) {
+  const before = Date.now()
+
   objectList.forEach((r) => r.update(delta))
   timeToEnemySpawn -= delta.delta
   if (timeToEnemySpawn <= 0) {
@@ -542,6 +545,8 @@ function update(delta: Delta) {
       }
     }
   }
+
+  maxUpdateTime = Math.max(maxUpdateTime, Date.now() - before)
 }
 
 function gameOver() {
@@ -651,8 +656,10 @@ const context = checkNullable(canvas.getContext("2d"))
 context.scale(scaleFactor, scaleFactor)
 context.save()
 
+let maxRenderTime = 0
 function renderScreen() {
   window.requestAnimationFrame(renderScreen)
+  const before = Date.now()
   try {
     objectList.forEach((r) => {
       context.save()
@@ -662,6 +669,7 @@ function renderScreen() {
   } catch (err) {
     console.error(err)
   }
+  maxRenderTime = Math.max(maxRenderTime, Date.now() - before)
 }
 renderScreen()
 
@@ -700,3 +708,5 @@ function playSfx(name: string) {
     console.error(err)
   }
 }
+
+window.setInterval(() => console.log("max render time:", maxRenderTime, ", max update time:", maxUpdateTime), 1000)
