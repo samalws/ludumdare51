@@ -267,9 +267,15 @@ class Player extends GameObject {
       this.pos = addVecs(centerVec, mulVec(relPos, innerRadius/Math.sqrt(distFromCenterSq)))
   }
   keysChanged(velNew: Vec) {
-    if (vecMagnitudeSq(velNew) == 2)
+    const mag = vecMagnitudeSq(velNew)
+    if (mag == 2)
       velNew = mulVec(velNew, oneOverSqrt2)
     this.setVel(mulVec(velNew, 100/1000))
+
+    if (mag == 0)
+      engineAudio.pause()
+    else
+      engineAudio.play()
   }
 }
 
@@ -340,6 +346,8 @@ class WizEnemy extends Enemy {
     if (this.timeToNewSpawn <= 0) {
       objectList.splice(1,0,new ProtoBasicEnemy(this.pos, addVecs(centerVec, randomRadiusVec(outerRadius))))
       this.timeToNewSpawn = WizEnemy.spawnTimeFull
+
+      playSfx("wiz")
     }
   }
 }
@@ -374,6 +382,8 @@ class GreyGooEnemy extends Enemy {
     if (this.timeToNewSpawn <= 0) {
       spawnEnemy(greyGooEnemy(this.spawnsLeft-1), addVecs(this.pos, randomRadiusVec(50)))
       this.timeToNewSpawn = GreyGooEnemy.spawnTimeFull
+
+      playSfx("greyGoo")
     }
   }
 }
@@ -472,6 +482,7 @@ function removeEnemy(enemy: Enemy) {
     const radVec = randomRadiusVec(1)
     objectList.splice(1, 0, new Particle(addVecs(enemy.pos, mulVec(radVec, 20)), mulVec(radVec, 300/1000)))
   }
+  playSfx("explosion")
 }
 
 // GAME STATE
@@ -489,6 +500,7 @@ function spawnEnemy(ctor: (v: Vec) => Enemy, pos?: Vec) {
   const enemy = ctor(pos)
   enemyList.push(enemy)
   objectList.push(enemy)
+  playSfx("enemySpawn")
 }
 
 function update(delta: Delta) {
@@ -524,6 +536,8 @@ function gameOver() {
   clearInterval(timer)
   gameIsOver = true
   objectList.push(new TextObj("Game over! Press R to play again.", 100))
+
+  playSfx("gameover")
 }
 
 function initGame() {
@@ -543,6 +557,8 @@ function initGame() {
 
   gameIsOver = false
   gameIsTut = false
+
+  playSfx("gameBegin")
 }
 
 function initTut() {
@@ -579,8 +595,7 @@ const alertKey = (upOrDown: boolean) => (event: KeyboardEvent) => {
     resetGame()
   } else if (event.code == "Space" && !upOrDown && gameIsTut) {
     resetGame()
-    const song = document.getElementById("song") as HTMLAudioElement
-    song.play() // TODO can this throw an exception?
+    songAudio.play() // TODO what if not loaded yet?
   } else {
     const dir = enumDirMap[event.code]
     if (dir === undefined) return
@@ -610,3 +625,35 @@ function renderScreen() {
   objectList.forEach((r) => r.render(context, canvas.width, canvas.height))
 }
 renderScreen()
+
+const songAudio = new Audio("song.wav")
+songAudio.loop = true
+
+const engineAudio = new Audio("engineOn.wav")
+engineAudio.loop = true
+
+const sfxAudio: { [name: string]: HTMLAudioElement[] } = {}
+
+function addSfx(name: string, n: number = 3) {
+  const audioList: HTMLAudioElement[] = []
+  for (let i = 0; i < n; i++)
+    audioList.push(new Audio(name + ".wav"))
+  sfxAudio[name] = audioList
+}
+
+addSfx("enemySpawn")
+addSfx("explosion")
+addSfx("gameBegin")
+addSfx("gameBegin2") // TODO
+addSfx("gameover")
+addSfx("greyGoo")
+addSfx("wiz")
+
+function playSfx(name: string) {
+  const audioList = sfxAudio[name]
+  for (const audio of audioList)
+    if (audio.paused) {
+      audio.play()
+      break
+    }
+}
