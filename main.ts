@@ -1,3 +1,7 @@
+const oneOverSqrt2 = 1/Math.sqrt(2)
+const imgWidthToRadius = .5*Math.sqrt(2)
+const epsilon = .0001
+
 interface Renderable {
   render: (ctx: CanvasRenderingContext2D, xSize: number, ySize: number) => void
 }
@@ -31,7 +35,7 @@ const dirVecMap = {
   [Direction.Down]: vec(0, 1),
 }
 
-const canvasSize = vec(1200, 1200)
+const canvasSize = 1200
 const originVec = vec(0, 0)
 const centerVec = vec(600, 600)
 const outerRadius = 500
@@ -110,21 +114,29 @@ class Delta {
 
 function genBackgroundStars(): Vec[] {
   const stars: Vec[] = []
-  for (let i = 0; i < 500; i++)
-    stars.push(vec(Math.random() * canvasSize.x, Math.random() * canvasSize.y))
+  const genRad = imgWidthToRadius * canvasSize
+  const genDiam = genRad*2
+  for (let i = 0; i < 1000; i++) // 500 * sqrt(2) * sqrt(2)
+    stars.push(vec(Math.random() * genDiam - genRad, Math.random() * genDiam - genRad))
   return stars
 }
 
+function rotBackgroundStars(stars: Vec[], delta: Delta): Vec[] {
+  return stars.map((s) => delta.rotateVec(s))
+}
+
 class Background implements Renderable, Updatable {
-  static readonly stars = genBackgroundStars()
+  static stars = genBackgroundStars()
   constructor() {}
   render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
     ctx.fillStyle = "#2A324B"
     ctx.fillRect(0, 0, xSize, ySize)
     ctx.fillStyle = "#FFFFFF"
-    Background.stars.forEach((s) => ctx.fillRect(s.x, s.y, 2, 2))
+    Background.stars.forEach((s) => ctx.fillRect(s.x + centerVec.x, s.y + centerVec.y, 2, 2))
   }
-  update(delta: Delta) {}
+  update(delta: Delta) {
+    Background.stars = rotBackgroundStars(Background.stars, delta)
+  }
 }
 
 class TextObj implements Renderable, Updatable {
@@ -184,9 +196,6 @@ class Particle implements Renderable, Updatable {
   }
 }
 
-const imgWidthToRadius = .5*Math.sqrt(2)
-const epsilon = .0001
-
 class GameObject implements Renderable, Updatable, HasHitbox {
   pos: Vec
   vel: Vec
@@ -243,8 +252,6 @@ class Center extends GameObject {
     enemyList.forEach((e) => { if (hitboxesCollide(this, e)) gameOver() })
   }
 }
-
-const oneOverSqrt2 = 1/Math.sqrt(2)
 
 class Player extends GameObject {
   constructor() {
@@ -489,8 +496,8 @@ function update(delta: Delta) {
   timeToEnemySpawn -= delta.delta
   if (timeToEnemySpawn <= 0) {
     timeToEnemySpawn = 1000 * 10
-    const numSpawnsDec = Math.floor(Math.random() * 2)
-    for (let i = 0; i <= numSpawnsDec; i++) {
+    const numSpawns = (score < 3) ? 1 : (score < 15) ? 2 : (score < 30) ? 3 : 4
+    for (let i = 0; i < numSpawns; i++) {
       const rng = Math.random()
       if (rng < 1/7)
         spawnEnemy(wizEnemy)
