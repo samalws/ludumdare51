@@ -180,12 +180,10 @@ class Particle implements Renderable, Updatable {
     this.color = Particle.colors[Math.floor(Math.random() * Particle.colors.length)]
   }
   render(ctx: CanvasRenderingContext2D) {
-    ctx.save()
     ctx.translate(this.pos.x, this.pos.y)
     ctx.rotate(this.angle)
     ctx.fillStyle = this.color
     ctx.fillRect(-10, -10, 20, 20)
-    ctx.restore()
   }
   update(delta: Delta) {
     this.pos = addVecs(this.pos, mulVec(this.vel, delta.delta))
@@ -212,11 +210,9 @@ class GameObject implements Renderable, Updatable, HasHitbox {
   }
   imgAngle = 0
   render(ctx: CanvasRenderingContext2D) {
-    ctx.save()
     ctx.translate(this.pos.x, this.pos.y)
     ctx.rotate(this.imgAngle)
     ctx.drawImage(this.img, -this.img.width*.5, -this.img.height*.5)
-    ctx.restore()
   }
   update(delta: Delta) {
     this.pos = addVecs(this.pos, mulVec(this.vel, delta.delta))
@@ -274,10 +270,14 @@ class Player extends GameObject {
       velNew = mulVec(velNew, oneOverSqrt2)
     this.setVel(mulVec(velNew, 100/1000))
 
-    if (mag == 0)
-      engineAudio.pause()
-    else
-      engineAudio.play()
+    try {
+      if (mag == 0)
+        engineAudio.pause()
+      else
+        engineAudio.play()
+    } catch (err) {
+      console.error(err)
+    }
   }
 }
 
@@ -595,6 +595,11 @@ function initTut() {
 function resetGame() {
   gameOver()
   initGame()
+  try {
+    songAudio.play()
+  } catch (err) {
+    console.error(err)
+  }
 }
 
 const enumDirMap: { [s: string]: Direction } = {
@@ -616,7 +621,6 @@ const alertKey = (upOrDown: boolean) => (event: KeyboardEvent) => {
     resetGame()
   } else if (event.code == "Space" && !upOrDown && gameIsTut) {
     resetGame()
-    songAudio.play() // TODO what if not loaded yet?
   } else {
     const dir = enumDirMap[event.code]
     if (dir === undefined) return
@@ -632,9 +636,9 @@ document.addEventListener("keyup", alertKey(false), false)
 
 initTut()
 
-function checkContext(x: CanvasRenderingContext2D | null): CanvasRenderingContext2D {
+function checkNullable<T>(x: T | null): T {
   if (x === null)
-    throw "null rendering context"
+    throw "null value"
   return x
 }
 
@@ -643,12 +647,21 @@ const realCanvasSize = Math.min(window.innerWidth, window.innerHeight) * .9
 canvas.width = realCanvasSize
 canvas.height = realCanvasSize
 const scaleFactor = realCanvasSize/canvasSize
-const context = checkContext(canvas.getContext("2d"))
+const context = checkNullable(canvas.getContext("2d"))
 context.scale(scaleFactor, scaleFactor)
+context.save()
 
 function renderScreen() {
   window.requestAnimationFrame(renderScreen)
-  objectList.forEach((r) => r.render(context))
+  try {
+    objectList.forEach((r) => {
+      context.save()
+      try { r.render(context) } catch (err) { console.error(err) }
+      context.restore()
+    })
+  } catch (err) {
+    console.error(err)
+  }
 }
 renderScreen()
 
@@ -676,10 +689,14 @@ addSfx("greyGoo")
 addSfx("wiz")
 
 function playSfx(name: string) {
-  const audioList = sfxAudio[name]
-  for (const audio of audioList)
-    if (audio.paused) {
-      audio.play()
-      break
-    }
+  try {
+    const audioList = sfxAudio[name]
+    for (const audio of audioList)
+      if (audio.paused) {
+        audio.play()
+        break
+      }
+  } catch (err) {
+    console.error(err)
+  }
 }
