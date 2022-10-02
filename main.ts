@@ -3,7 +3,7 @@ const imgWidthToRadius = .5*Math.sqrt(2)
 const epsilon = .0001
 
 interface Renderable {
-  render: (ctx: CanvasRenderingContext2D, xSize: number, ySize: number) => void
+  render: (ctx: CanvasRenderingContext2D) => void
 }
 
 interface Updatable {
@@ -128,9 +128,9 @@ function rotBackgroundStars(stars: Vec[], delta: Delta): Vec[] {
 class Background implements Renderable, Updatable {
   static stars = genBackgroundStars()
   constructor() {}
-  render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
+  render(ctx: CanvasRenderingContext2D) {
     ctx.fillStyle = "#2A324B"
-    ctx.fillRect(0, 0, xSize, ySize)
+    ctx.fillRect(0, 0, canvasSize, canvasSize)
     ctx.fillStyle = "#FFFFFF"
     Background.stars.forEach((s) => ctx.fillRect(s.x + centerVec.x, s.y + centerVec.y, 2, 2))
   }
@@ -146,7 +146,7 @@ class TextObj implements Renderable, Updatable {
     this.text = text
     this.height = height
   }
-  render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
+  render(ctx: CanvasRenderingContext2D) {
     ctx.font = "48px sans-serif"
     ctx.fillStyle = "#E58F65"
     ctx.fillText(this.text, 10, this.height)
@@ -179,7 +179,7 @@ class Particle implements Renderable, Updatable {
     this.lifetime = Math.random() * Particle.lifetimeMax
     this.color = Particle.colors[Math.floor(Math.random() * Particle.colors.length)]
   }
-  render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
+  render(ctx: CanvasRenderingContext2D) {
     ctx.save()
     ctx.translate(this.pos.x, this.pos.y)
     ctx.rotate(this.angle)
@@ -211,7 +211,7 @@ class GameObject implements Renderable, Updatable, HasHitbox {
     this.particleSpeed = particleSpeed
   }
   imgAngle = 0
-  render(ctx: CanvasRenderingContext2D, xSize: number, ySize: number) {
+  render(ctx: CanvasRenderingContext2D) {
     ctx.save()
     ctx.translate(this.pos.x, this.pos.y)
     ctx.rotate(this.imgAngle)
@@ -639,11 +639,16 @@ function checkContext(x: CanvasRenderingContext2D | null): CanvasRenderingContex
 }
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement
+const realCanvasSize = Math.min(window.innerWidth, window.innerHeight) * .9
+canvas.width = realCanvasSize
+canvas.height = realCanvasSize
+const scaleFactor = realCanvasSize/canvasSize
 const context = checkContext(canvas.getContext("2d"))
+context.scale(scaleFactor, scaleFactor)
 
 function renderScreen() {
   window.requestAnimationFrame(renderScreen)
-  objectList.forEach((r) => r.render(context, canvas.width, canvas.height))
+  objectList.forEach((r) => r.render(context))
 }
 renderScreen()
 
