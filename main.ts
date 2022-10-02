@@ -416,7 +416,7 @@ function initGame() {
 function initTut() {
   player = new Player()
   enemyList = []
-  objectList = [new Background, new Center, player, new TextObj("Use arrow keys to move.", 50), new TextObj("Don't const any monsters get to the center.", 100), new TextObj("Press space to begin.", 150)]
+  objectList = [new Background, new Center, player, new TextObj("Use arrow keys to move.", 50), new TextObj("Don't let any monsters get to the center.", 100), new TextObj("Press space to begin.", 150)]
   score = 0
   timeToEnemySpawn = 0
   gameIsOver = false
