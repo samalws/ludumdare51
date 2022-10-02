@@ -572,6 +572,8 @@ const alertKey = (upOrDown: boolean) => (event: KeyboardEvent) => {
     resetGame()
   } else if (event.code == "Space" && !upOrDown && gameIsTut) {
     resetGame()
+    const song = document.getElementById("song") as HTMLAudioElement
+    song.play() // TODO can this throw an exception?
   } else {
     const dir = enumDirMap[event.code]
     if (dir === undefined) return
