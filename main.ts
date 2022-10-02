@@ -2,6 +2,9 @@ const oneOverSqrt2 = 1/Math.sqrt(2)
 const imgWidthToRadius = .5*Math.sqrt(2)
 const epsilon = .0001
 
+const scoreCutoff1 = 16
+const scoreCutoff2 = 64
+
 interface Renderable {
   render: (ctx: CanvasRenderingContext2D) => void
 }
@@ -140,24 +143,31 @@ class Background implements Renderable, Updatable {
 }
 
 class TextObj implements Renderable, Updatable {
+  static readonly orangeColor = "#E58F65"
+  static readonly redColor = "#CA1551"
+  static readonly greenColor = "#A2FAA3"
+
   text: string
-  readonly height: number
-  constructor(text: string, height: number) {
+  readonly yPos: number
+  color: string
+  constructor(text: string, yPos: number, color: string) {
     this.text = text
-    this.height = height
+    this.yPos = yPos
+    this.color = color
   }
   render(ctx: CanvasRenderingContext2D) {
-    ctx.font = "48px sans-serif"
-    ctx.fillStyle = "#E58F65"
-    ctx.fillText(this.text, 10, this.height)
+    ctx.font = "bold 48px sans-serif"
+    ctx.fillStyle = this.color
+    ctx.fillText(this.text, 10, this.yPos)
   }
   update(delta: Delta) {}
 }
 
 class ScoreObj extends TextObj {
-  constructor() { super("0", 50) }
+  constructor() { super("0", 50, TextObj.orangeColor) }
   update(delta: Delta) {
     this.text = "" + score
+    this.color = (score < scoreCutoff1) ? TextObj.orangeColor : (score < scoreCutoff2) ? TextObj.redColor : TextObj.greenColor
   }
 }
 
@@ -287,12 +297,12 @@ function velTowardsCenter(pos: Vec, speed: number): Vec {
 
 function velPerpCenter(pos: Vec, speed: number): Vec {
   const towards = velTowardsCenter(pos, speed)
-  return vec(-towards.y, towards.x)
+  return vec(towards.y, -towards.x)
 }
 
 function velCenterBlend(pos: Vec, towardsSpeed: number, perpSpeed: number) {
   const towards = velTowardsCenter(pos, 1)
-  return vec(towards.x * towardsSpeed - towards.y * perpSpeed, towards.y * towardsSpeed + towards.x * perpSpeed)
+  return vec(towards.x * towardsSpeed + towards.y * perpSpeed, towards.y * towardsSpeed - towards.x * perpSpeed)
 }
 
 class Enemy extends GameObject {
@@ -369,6 +379,9 @@ class GreyGooEnemy extends Enemy {
     super(pos, originVec, "greyGooEnemy")
     this.spawnsLeft = spawnsLeft
     this.givesPoints = spawnsLeft == GreyGooEnemy.defltSpawnsLeft
+
+    if (spawnsLeft == GreyGooEnemy.defltSpawnsLeft)
+      this.timeToNewSpawn *= .25
   }
   update(delta: Delta) {
     super.update(delta)
@@ -521,9 +534,9 @@ function update(delta: Delta) {
       spawnEnemy(tpEnemy)
     } else if (score == 2 || score == 3) {
       spawnEnemy(scaredEnemy)
-      spawnEnemy(tpEnemy)
+      spawnEnemy(greyGooEnemyDeflt)
     } else {
-      const numSpawns = (score < 16) ? 2 : (score < 64) ? 3 : 4
+      const numSpawns = (score < scoreCutoff1) ? 2 : (score < scoreCutoff2) ? 3 : 4
       for (let i = 0; i < numSpawns; i++) {
         const rng = Math.random()
         if (rng < 1/7)
@@ -553,7 +566,7 @@ function gameOver() {
   if (gameIsOver) return
   clearInterval(timer)
   gameIsOver = true
-  objectList.push(new TextObj("Game over! Press R to play again.", 100))
+  objectList.push(new TextObj("Game over! Press R to play again.", 100, TextObj.redColor))
 
   playSfx("gameover")
 }
@@ -586,10 +599,10 @@ function initTut() {
     new Background,
     new Center,
     player,
-    new TextObj("Use arrow keys to move.", 50),
-    new TextObj("Don't let any enemies get to the center.", 100),
-    new TextObj("Touch an enemy to kill it.", 150),
-    new TextObj("Press space to begin.", 200)
+    new TextObj("Use arrow keys to move.", 50, TextObj.orangeColor),
+    new TextObj("Don't let any enemies get to the center.", 100, TextObj.orangeColor),
+    new TextObj("Touch an enemy to kill it.", 150, TextObj.orangeColor),
+    new TextObj("Press space to begin.", 200, TextObj.greenColor)
   ]
   score = 0
   timeToEnemySpawn = 0
