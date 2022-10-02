@@ -1,1 +1,1 @@
-tsc main.ts --lib Dom,es2015 --strict
+tsc main.ts --lib Dom,es2017 --strict

@@ -283,7 +283,7 @@ class Player extends GameObject {
     try {
       if (mag == 0)
         engineAudio.pause()
-      else
+      else if (sfxEnabled)
         engineAudio.play()
     } catch (err) {
       console.error(err)
@@ -509,6 +509,7 @@ let timeToEnemySpawn: number
 let timer: number
 let gameIsOver: boolean = true
 let gameIsTut: boolean = false
+let gameIsPaused: boolean = false
 
 function spawnEnemy(ctor: (v: Vec) => Enemy, pos?: Vec) {
   pos = pos ?? addVecs(centerVec, randomRadiusVec(outerRadius))
@@ -520,6 +521,8 @@ function spawnEnemy(ctor: (v: Vec) => Enemy, pos?: Vec) {
 
 let maxUpdateTime = 0
 function update(delta: Delta) {
+  if (gameIsPaused) return
+
   const before = Date.now()
 
   objectList.forEach((r) => r.update(delta))
@@ -571,6 +574,21 @@ function gameOver() {
   playSfx("gameover")
 }
 
+const pauseMenu = [
+  new TextObj("Game is PAUSED.", 100, TextObj.orangeColor),
+  new TextObj("Press M to toggle music, N to toggle sound effects.", 150, TextObj.orangeColor),
+  new TextObj("Press space to resume.", 200, TextObj.greenColor),
+]
+
+function togglePause() {
+  gameIsPaused = !gameIsPaused
+  if (gameIsPaused) {
+    objectList = objectList.concat(pauseMenu)
+  } else {
+    pauseMenu.forEach((e) => removeFromList(e, objectList))
+  }
+}
+
 function initGame() {
   player = new Player()
   enemyList = []
@@ -599,10 +617,10 @@ function initTut() {
     new Background,
     new Center,
     player,
-    new TextObj("Use arrow keys to move.", 50, TextObj.orangeColor),
+    new TextObj("Use arrow keys to move and space to pause.", 50, TextObj.orangeColor),
     new TextObj("Don't let any enemies get to the center.", 100, TextObj.orangeColor),
     new TextObj("Touch an enemy to kill it.", 150, TextObj.orangeColor),
-    new TextObj("Press space to begin.", 200, TextObj.greenColor)
+    new TextObj("Press enter to begin.", 200, TextObj.greenColor)
   ]
   score = 0
   timeToEnemySpawn = 0
@@ -625,6 +643,10 @@ const enumDirMap: { [s: string]: Direction } = {
   "ArrowRight": Direction.Right,
   "ArrowUp": Direction.Up,
   "ArrowDown": Direction.Down,
+  "KeyA": Direction.Left,
+  "KeyD": Direction.Right,
+  "KeyW": Direction.Up,
+  "KeyS": Direction.Down,
 }
 
 const keysDown = {
@@ -637,8 +659,21 @@ const keysDown = {
 const alertKey = (upOrDown: boolean) => (event: KeyboardEvent) => {
   if (event.code == "KeyR" && !upOrDown && !gameIsTut) {
     resetGame()
-  } else if (event.code == "Space" && !upOrDown && gameIsTut) {
+  } else if (event.code == "Enter" && !upOrDown && gameIsTut) {
     resetGame()
+  } else if (event.code == "Space" && !upOrDown && !gameIsTut && !gameIsOver) {
+    togglePause()
+  } else if (event.code == "KeyM" && !upOrDown && !gameIsTut) {
+    try {
+      if (songAudio.paused)
+        songAudio.play()
+      else
+        songAudio.pause()
+    } catch (err) {
+      console.error(err)
+    }
+  } else if (event.code == "KeyN" && !upOrDown && !gameIsTut) {
+    toggleSfx()
   } else {
     const dir = enumDirMap[event.code]
     if (dir === undefined) return
@@ -694,6 +729,7 @@ const engineAudio = new Audio("engineOn.wav")
 engineAudio.loop = true
 
 const sfxAudio: { [name: string]: HTMLAudioElement[] } = {}
+let sfxEnabled = true
 
 function addSfx(name: string, n: number = 3) {
   const audioList: HTMLAudioElement[] = []
@@ -711,6 +747,7 @@ addSfx("greyGoo")
 addSfx("wiz")
 
 function playSfx(name: string) {
+  if (!sfxEnabled) return
   try {
     const audioList = sfxAudio[name]
     for (const audio of audioList)
@@ -720,6 +757,14 @@ function playSfx(name: string) {
       }
   } catch (err) {
     console.error(err)
+  }
+}
+
+function toggleSfx() {
+  sfxEnabled = !sfxEnabled
+  if (!sfxEnabled) {
+    engineAudio.pause()
+    Object.values(sfxAudio).forEach((l) => l.forEach((a) => a.pause()))
   }
 }
 
